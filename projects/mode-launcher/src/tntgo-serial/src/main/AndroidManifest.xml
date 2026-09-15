@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★★★ 任务 AS3b：TNT GO 串口共享库。
+
+  ## 这里【故意】什么都不声明
+
+  权限与 `<uses-feature>` 都由**使用它的 mod** 自己声明
+  （两个 mod 的 manifest 里本来就有 `android.hardware.usb.host`）。
+  库这边再声明一遍只是重复 —— 而且会让人误以为"用了这个库就自动有了权限"。
+
+  ⇒ 本库的职责只有一个：**把设备的开关/锁/白名单收成一处**。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />

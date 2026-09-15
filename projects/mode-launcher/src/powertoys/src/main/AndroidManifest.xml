@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★★★★★ Smartisan Powertoys —— 一体化应用的壳（任务 AL）。
+
+  ## 这个 manifest 几乎是空的，这是【故意的】
+
+  全部内容（权限 / Activity / Service / meta-data）都来自依赖的 library 模块，
+  由 **manifest merger** 汇总 —— 这正是合并方案的好处：
+  **各 mod 的 manifest 一个字都不用改**。
+
+  ## 这里只覆盖两件事
+
+  1. ★ **应用显示名** ⇒ `Smartisan Powertoys`
+     （包名仍是 `com.shware.mode`，见 build.gradle.kts 的说明）
+  2. ★ **包可见性 `<queries>`** —— 虽然 `:app` 里已经有一份，但这一条是
+     「A11+ 缺了就静默返回空列表」的那类致命项，**在最终 app 模块里再写一遍**，
+     免得将来有人把 `:app` 的 manifest 改了而没人注意。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <queries>
+        <intent>
+            <action android:name="com.shware.mode.action.MOD" />
+        </intent>
+    </queries>
+
+    <application
+        android:label="Smartisan Powertoys"
+        android:supportsRtl="true"
+        tools:replace="android:label" />
+
+</manifest>

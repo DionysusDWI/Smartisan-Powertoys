@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ 无障碍服务配置 —— 本 mod 的全部机关就在这两个属性上：
+
+    android:canRequestFilterKeyEvents="true"      ← ★★ 拿到【全局硬件按键】的开关
+    android:accessibilityFlags="...flagRequestFilterKeyEvents"
+
+  它让服务在按键**送进应用之前**先看到（官方 API / 无 root / ★ 不抢焦点）。
+
+  ⚠️ accessibilityEventTypes 故意设成最小集合 —— 我们**只关心按键**，
+     不去看窗口变化/内容，少一分隐私面。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/acc_desc"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRequestFilterKeyEvents"
+    android:canRequestFilterKeyEvents="true"
+    android:notificationTimeout="0"
+    android:settingsActivity="com.shware.mode.mod.brightness.SettingsActivity" />

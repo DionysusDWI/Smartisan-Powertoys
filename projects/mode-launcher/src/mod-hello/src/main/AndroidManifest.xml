@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★★ 一个 MOD 的 manifest 模板 —— 照抄这一段就能被 MODE 启动器发现。
+
+  契约见 :app 的 com.shware.mode.mod.ModContract（**故意不共享代码**）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 常驻组件 = 前台服务 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      ★ 画在别人屏上要这个（appop，装完之后用 adb 授一次）：
+        adb shell appops set com.shware.mode.mod.hello SYSTEM_ALERT_WINDOW allow
+    -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="true"
+        android:label="MODE 示例组件"
+        android:supportsRtl="true">
+
+        <!-- ★★★ 这一整块就是「mod 契约」。启动器扫的就是它。 -->
+        <service
+            android:name=".HelloModService"
+            android:process=":mod_hello"
+            android:exported="true"
+            android:label="MODE 示例组件"
+            android:foregroundServiceType="specialUse">
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MODE launcher mod: status card overlay" />
+
+            <!-- ① 锚点 action —— 启动器 queryIntentServices 找的就是它 -->
+            <intent-filter>
+                <action android:name="com.shware.mode.action.MOD" />
+            </intent-filter>
+
+            <!-- ② 申报信息 -->
+            <meta-data android:name="com.shware.mode.MOD_API"    android:value="1" />
+            <meta-data android:name="com.shware.mode.MOD_ID"     android:value="hello.card" />
+            <meta-data android:name="com.shware.mode.MOD_NAME"   android:value="示例·状态卡片" />
+            <meta-data android:name="com.shware.mode.MOD_DESC"   android:value="在 TNT 屏上画一个手机状态卡片（模板 mod）" />
+            <!-- tnt = 画在 TNT 屏(100000) ｜ phone = 画在手机屏(0) -->
+            <meta-data android:name="com.shware.mode.MOD_TARGET" android:value="tnt" />
+            <!--
+              ★★★ 触摸行为（详见 ModContract §四）—— 两条互斥的路：
+
+                none = 纯展示：窗口带 FLAG_NOT_TOUCHABLE ⇒ 整块矩形【完全穿透】，
+                       盖住的那块区域下面的东西照常能点。⚠️ 自己也点不了 ⇒ 不能配按钮。
+                self = 交互：窗口带 NOT_FOCUSABLE|NOT_TOUCH_MODAL ⇒
+                       只吃【自己矩形内】的点击，矩形外照常穿透。有按钮必须用它。
+
+              ⚠️ 根布局必须 WRAP_CONTENT —— MATCH_PARENT 会让触摸区变成整屏，
+                 交互型会吃掉 TNT 上所有点击。
+            -->
+            <meta-data android:name="com.shware.mode.MOD_TOUCH" android:value="none" />
+            <!-- 默认关 —— 装完不会自己乱画，要由用户在管理器里打开 -->
+            <!-- ★ 图形化 UI 用的可选申报（任务 AP）—— 不写也有合理默认 -->
+            <meta-data android:name="com.shware.mode.MOD_CATEGORY" android:value="other" />
+            <meta-data android:name="com.shware.mode.MOD_ORDER"    android:value="90" />
+            <meta-data android:name="com.shware.mode.MOD_ICON"     android:value="feat_hello" />
+            <meta-data android:name="com.shware.mode.MOD_ENABLED_BY_DEFAULT" android:value="false" />
+        </service>
+
+    </application>
+
+</manifest>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ Smartisan Powertoys 配色（任务 AP）。
+
+  取色来自图标规范本身 —— 界面与图标用同一套色，才不会"图标是一套、界面是另一套"。
+
+  | 名字 | 值 | 用在哪 |
+  | 米白 | #F2EDE4 | 页面底色（也是图标的背景色） |
+  | 深墨蓝 | #16202B | 主文字 / 图标轮廓 |
+  | 青绿 | #2E7D6F | 主色（开关、强调） |
+  | 琥珀黄 | #E8A33D | 点缀（运行中、警示） |
+
+  ⚠️ **XML 注释里不能出现连续两个减号**（连表格分隔行那种三条杠也不行）——
+  否则 aapt 会报「注释中不能包含字符串」并**中断整个构建**。
+  ★ 这个文件的第一版就踩了两次：一次是表格分隔行，一次是这句警告里
+  引用了那两个字面字符本身。所以下面所有的表都不写分隔行。
+
+  ⚠️ 资源名统一加 `pt_` 前缀 —— 这个模块是 **library**，
+  资源会和 6 个 mod 的合并，不加前缀迟早撞名。
+-->
+<resources>
+
+    <!-- 底色与表面 -->
+    <color name="pt_bg">#F2EDE4</color>
+    <color name="pt_surface">#FFFCF7</color>
+    <color name="pt_surface_alt">#EAE3D7</color>
+
+    <!-- 文字 -->
+    <color name="pt_ink">#16202B</color>
+    <color name="pt_ink_soft">#5A6673</color>
+    <color name="pt_ink_faint">#93A0AC</color>
+
+    <!-- 主色 -->
+    <color name="pt_primary">#2E7D6F</color>
+    <color name="pt_primary_dark">#1F5B50</color>
+    <color name="pt_accent">#E8A33D</color>
+
+    <!-- 状态 -->
+    <color name="pt_state_running">#2E7D6F</color>
+    <color name="pt_state_stopped">#93A0AC</color>
+    <color name="pt_state_unknown">#E8A33D</color>
+    <color name="pt_state_error">#C0392B</color>
+
+    <!-- 分隔与描边 -->
+    <color name="pt_divider">#1416202B</color>
+    <color name="pt_outline">#D9D0C1</color>
+
+    <!-- ★ 分类色：给"没有专属图标"的功能兜底用 -->
+    <color name="pt_cat_display">#3A6EA5</color>
+    <color name="pt_cat_input">#6B5B95</color>
+    <color name="pt_cat_performance">#C0392B</color>
+    <color name="pt_cat_media">#2E7D6F</color>
+    <color name="pt_cat_system">#7A6A55</color>
+    <color name="pt_cat_other">#7A8794</color>
+
+</resources>

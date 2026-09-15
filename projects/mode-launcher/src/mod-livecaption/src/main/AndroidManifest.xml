@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ MOD：实时字幕（契约见 :app 的 com.shware.mode.mod.ModContract）
+
+  ⚠️ 装完还有一步 adb 干不了：去「手机管理 → 权限管理 → 实时字幕 → 悬浮窗」打开开关。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 连 DashScope 的 WebSocket -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 音源 B：麦克风（运行时权限，需要 Activity 请求） -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <!-- ★ 播放捕获要它（A14+ 起是必须的；A10 上不影响） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="true"
+        android:label="实时字幕"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false">
+
+        <service
+            android:name=".CaptionService"
+            android:process=":mod_livecaption"
+            android:exported="true"
+            android:label="实时字幕"
+            android:foregroundServiceType="mediaProjection|microphone|specialUse">
+            <!-- ⚠️ `mediaProjection` 不能少 —— 少了 `getMediaProjection()` 会抛
+                 「Media projections require a foreground service of type
+                  FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION」（实测踩过） -->
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MODE launcher mod: realtime speech caption overlay" />
+
+            <!-- ① 锚点 action -->
+            <intent-filter>
+                <action android:name="com.shware.mode.action.MOD" />
+            </intent-filter>
+
+            <!-- ② 申报信息 -->
+            <meta-data android:name="com.shware.mode.MOD_API"    android:value="1" />
+            <meta-data android:name="com.shware.mode.MOD_ID"     android:value="live.caption" />
+            <meta-data android:name="com.shware.mode.MOD_NAME"   android:value="实时字幕" />
+            <meta-data android:name="com.shware.mode.MOD_DESC"   android:value="抓音源送云端实时识别，在 TNT 屏上滚字幕" />
+            <meta-data android:name="com.shware.mode.MOD_TARGET" android:value="tnt" />
+            <!-- 纯展示：字幕卡片整块穿透，不挡 TNT 上的操作 -->
+            <meta-data android:name="com.shware.mode.MOD_TOUCH"  android:value="none" />
+            <!-- ★ 设置/授权入口（宿主管理器会多一个「设置」按钮） -->
+            <meta-data android:name="com.shware.mode.MOD_SETTINGS" android:value=".SetupActivity" />
+            <!-- ★ 图形化 UI 用的可选申报（任务 AP）—— 不写也有合理默认 -->
+            <meta-data android:name="com.shware.mode.MOD_CATEGORY" android:value="media" />
+            <meta-data android:name="com.shware.mode.MOD_ORDER"    android:value="10" />
+            <meta-data android:name="com.shware.mode.MOD_ICON"     android:value="feat_caption" />
+            <meta-data android:name="com.shware.mode.MOD_ENABLED_BY_DEFAULT" android:value="false" />
+        </service>
+
+        <!--
+          ★ 设置 + 授权入口。
+          ★ 合并成一个 APK 后**不再带 LAUNCHER**（见任务 AP）——
+  入口改为主界面卡片上的「设置」按钮，避免一个应用出现多个桌面图标。
+        -->
+        <activity
+            android:process=":mod_livecaption"
+            android:name=".SetupActivity"
+            android:exported="true"
+            android:label="实时字幕"
+            android:launchMode="singleTop">
+        </activity>
+
+    </application>
+
+</manifest>

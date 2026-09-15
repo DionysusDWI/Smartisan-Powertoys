@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">闪念胶囊（复刻）</string>
+
+    <string name="status_idle">就绪</string>
+    <string name="status_recording">录音中… 再次点击停止</string>
+    <string name="status_transcribing">正在转写…</string>
+    <string name="status_done">转写完成</string>
+    <string name="status_no_key">未配置 SILICONFLOW_API_KEY（见 local.properties）</string>
+    <string name="status_no_permission">缺少录音权限</string>
+
+    <string name="btn_record">按住说话（点击开始）</string>
+    <string name="btn_stop">停止录音</string>
+
+    <string name="result_placeholder">转写结果会显示在这里</string>
+    <string name="hint_mvp">MVP：验证「录音 → 硅基流动 SenseVoice 转写」链路</string>
+
+    <!-- M1 -->
+    <string name="btn_overlay">1. 授予悬浮窗权限</string>
+    <string name="btn_start_sidebar">2. 启动侧边栏把手</string>
+    <string name="btn_stop_sidebar">停止侧边栏</string>
+    <string name="btn_open_list">打开胶囊列表</string>
+    <string name="empty_list">还没有胶囊，点侧边把手录一条吧</string>
+    <string name="title_capsule_list">闪念胶囊</string>
+    <string name="hint_m1">点击屏幕右缘的把手开始录音，再点一次停止并自动转写。\n把手可上下拖动；若与系统手势冲突，拖到其他位置即可。</string>
+
+    <!-- M2 -->
+    <string name="detail_title">胶囊详情</string>
+    <string name="detail_text_hint">输入内容</string>
+    <string name="detail_tag_label">分类</string>
+    <string name="detail_play">▶ 播放原声</string>
+    <string name="detail_delete">删除</string>
+    <string name="detail_save">保存</string>
+
+    <!-- M3 / M5 -->
+    <string name="search_hint">搜索胶囊…</string>
+    <string name="detail_pinned">置顶</string>
+    <string name="detail_done">已完成</string>
+    <string name="detail_share">分享</string>
+    <string name="detail_copy">复制</string>
+    <string name="detail_calendar">转日历</string>
+    <string name="detail_remind">提醒</string>
+    <string name="remind_title">提醒时间</string>
+    <string name="btn_autostart">3. 小米自启动 / 省电设置</string>
+</resources>

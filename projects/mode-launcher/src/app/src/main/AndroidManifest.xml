@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- TNT 屏 overlay（自绘 chrome 的载体） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- A14+ 起前台服务要按类型申请；A10 上无影响，但先声明好，免得将来迁移时才发现 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      ★★★ 包可见性 —— 【必须有】，否则 ModRegistry 在 A11+ 上静默返回空列表。
+
+      A10 的坚果没有包可见性限制 ⇒ 少了这段在本机"看起来完全正常"，
+      换到 A16 就整个 Mod 管理器空掉 —— 属于最难查的那类问题。
+      宁可现在写，也不要到迁移时才发现。
+    -->
+    <queries>
+        <intent>
+            <action android:name="com.shware.mode.action.MOD" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Mode">
+
+        <!--
+          ★★★★★ 主界面（任务 AP / AP5）—— 用户点图标进的就是它。
+
+          ⚠️ 它**必须**排在 MainActivity 前面拿 LAUNCHER ——
+          见下面 MainActivity 的说明。
+        -->
+        <activity
+            android:name=".ui.HomeActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          ★★ 图层管理（任务 AP / AP6）—— 用户点名要的「多层同屏管理」。
+
+          **不导出**：它只有从主界面进这一条路，没有对外入口。
+        -->
+        <activity
+            android:name=".ui.LayerActivity"
+            android:exported="false"
+            android:label="@string/pt_layer_title"
+            android:parentActivityName=".ui.HomeActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode" />
+
+        <!--
+          ★★★★★ 工程台（940 行）—— **保留，一行没删**，但**降级到「开发者选项」入口**。
+
+          | 改动 | 原因 |
+          | 去掉 `LAUNCHER` intent-filter | 它是开发自检台，不是给用户看的（"界面过于工程化"的根源） |
+          | `exported="false"` | 既然不再是入口，就不该被外部拉起 |
+          | 入口改为 HomeActivity 的「开发者选项」按钮 | 自检能力是**资产**，不能丢（计划书 AP §7 风险 5） |
+
+          ⚠️ 表格不写分隔行 —— **XML 注释里出现连续两个减号会让 aapt 直接报错**。
+
+          ⇒ 它的显示枚举 / 权限检查 / 手势测试 / 原始 dump 全部照旧可用。
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="Powertoys 工程台"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density|uiMode" />
+
+        <!--
+          ★★★★★ 对外 API（任务 AP / AP7）—— 给**后续工程**调用的入口。
+
+          `exported="true"` 是**故意**的："暴露 API 供后续工程调用"就是这个意思。
+
+          ⚠️ 它能做的仅限"读写本应用自己的功能开关与图层"，
+             碰不到系统设置，也**不能**代替 Shizuku 授权
+             （Shizuku 的授权只对本应用生效）⇒ 被调用不构成提权。
+        -->
+        <service
+            android:name=".api.PowerToysApiService"
+            android:exported="true"
+            android:label="Powertoys API">
+            <intent-filter>
+                <action android:name="com.shware.mode.action.API" />
+            </intent-filter>
+        </service>
+
+        <!--
+          ★ Shizuku 的 ContentProvider —— 必需。
+          少了它，Shizuku 与本 App 的握手起不来（binder 永远收不到）。
+        -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
+        <!--
+          ★★ 保活前台服务 —— 「用那个启动器来保持它的运行」的载体。
+          它把宿主进程钉住，并每 30s 巡查一次已启用的 mod、补拉掉队的。
+        -->
+        <service
+            android:name=".LauncherService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keep loaded TNT mod components alive" />
+        </service>
+
+        <!--
+          ★ 全局按键观察（无 root 下截 Meta/Win 组合键的唯一路径）。
+          需要用户在「设置 → 无障碍」里手动开启。
+        -->
+        <service
+            android:name=".input.MetaKeyService"
+            android:exported="true"
+            android:label="@string/meta_key_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/meta_key_service" />
+        </service>
+
+    </application>
+
+</manifest>

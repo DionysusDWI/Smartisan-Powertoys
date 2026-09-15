@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TNT GO 电量</string>
+
+    <string name="status_placeholder">正在读取状态…</string>
+    <string name="btn_usb">请求 USB 权限</string>
+    <string name="btn_probe">① 厂商寄存器只读扫描（路线 B）</string>
+    <string name="btn_serial_probe">② 串口 AT 探测（路线 C）</string>
+    <string name="btn_send">发送</string>
+    <string name="hint_cmd">手输 AT 命令，如 AT+TEMP / AT+BQ25890</string>
+    <string name="cmd_blocked">⛔ 已拒绝：命中禁区「%1$s」。该命令会关机/重启/变砖 TNT GO，永不发送。</string>
+    <string name="cmd_refused">未发送：%1$s</string>
+    <string name="btn_start">启动悬浮显示（路线 C）</string>
+    <string name="btn_stop">停止</string>
+    <string name="hint">【路线 B】厂商寄存器扫描：走端点 0 的 controlTransfer，只发 IN 请求，不 claim 任何接口，不会干扰键盘 / 触控板。\n先打自检（已知可读的 DP lane 寄存器）；自检通过后再扫电量寄存器。\n结果同时写入 logcat（tag=TNTGO_PROBE）与文件。\n\n【路线 C】悬浮显示：通过 CDC-ACM 串口发 at+adb 读 +BATCG。</string>
+
+    <string name="probe_running">正在扫描…（最长约 60 秒，请勿离开）</string>
+    <string name="probe_no_device">TNT GO 未连接，或未授权 USB 权限。请先点「请求 USB 权限」。</string>
+    <string name="probe_done">扫描完成。结果已写入：</string>
+
+    <string name="card_phone_placeholder">手机 —</string>
+    <string name="card_screen_placeholder">屏幕 —</string>
+
+    <string name="notif_channel_name">电量悬浮窗</string>
+    <string name="notif_title">TNT GO 电量悬浮窗运行中</string>
+    <string name="notif_text">正在监听外接显示器</string>
+</resources>

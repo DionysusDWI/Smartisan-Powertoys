@@ -1,0 +1,7 @@
+# 复制本文件为 local.properties 并填写真实值（local.properties 不要提交/分享）
+
+# Android SDK 路径（Android Studio 通常自动生成）
+sdk.dir=/path/to/Android/sdk
+
+# 硅基流动 API Key（用于语音转写，FunAudioLLM/SenseVoiceSmall）
+SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

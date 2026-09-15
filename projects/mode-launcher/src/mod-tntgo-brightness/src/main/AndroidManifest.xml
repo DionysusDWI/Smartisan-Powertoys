@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ MOD：TNT GO 亮度键（任务 AI）—— 契约见 :app 的 com.shware.mode.mod.ModContract。
+
+  ## 这个 mod 干什么
+
+  TNT GO 键盘上那两个「太阳」键（用户口中的 F10 / F12）**不发 F 键码**，
+  而是走 **Consumer Control 设备**发标准 `KEYCODE_BRIGHTNESS_DOWN / UP`
+  （2026-09-13 用 getevent 实测，证据 .ref/tntgo_brightness_keys/）。
+
+  系统本来就会接这两个键 —— 但 TNT GO 的背光链路（casthal / Boston）在本机是死的，
+  所以它只会弹一句「暂不支持该设备的亮度调节」。
+
+  ⇒ 本 mod 用 `AccessibilityService` 的**按键过滤器**抢先拿到它们，
+     换成 `AT+BKL=<v>` 从 USB CDC-ACM 发出去。
+
+  ## ⚠️ 装完之后【两步 adb 干不了】的手动授权
+
+  1. ★ **设置 → 无障碍 → 本应用** 打开（`AccessibilityService` 只能人手启用）
+  2. ★ **手机管理 → 权限管理 → TNT GO 亮度 → 悬浮窗**（Smartisan 的第二道门）
+  3. 首次还会弹一次「允许访问 USB 设备」——**建议勾「默认」**
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- TNT GO 的 CDC-ACM 串口挂在 USB 主机总线上 -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 画 OSD 卡片要这个（appop，装完后用 adb 授一次）：
+           adb shell appops set com.shware.mode.mod.brightness SYSTEM_ALERT_WINDOW allow -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+
+        <!-- ================= ① 契约服务：宿主发现 / 启停的就是它 ================= -->
+        <service
+            android:name=".BrightnessModService"
+            android:process=":mod_brightness"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:foregroundServiceType="specialUse">
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MODE launcher mod: TNT GO brightness key handler" />
+
+            <intent-filter>
+                <action android:name="com.shware.mode.action.MOD" />
+            </intent-filter>
+
+            <meta-data android:name="com.shware.mode.MOD_API"    android:value="1" />
+            <meta-data android:name="com.shware.mode.MOD_ID"     android:value="tntgo.brightness" />
+            <meta-data android:name="com.shware.mode.MOD_NAME"   android:value="TNT GO 亮度" />
+            <meta-data android:name="com.shware.mode.MOD_DESC"   android:value="键盘亮度键 → AT+BKL（需手动开无障碍）" />
+            <meta-data android:name="com.shware.mode.MOD_TARGET" android:value="tnt" />
+            <!--
+              ★★ 触摸行为：**self**（不是 none）。
+
+              为什么改（用户 2026-09-13 要求「和手机性能悬浮窗一样，**可被点击高亮和被拖动**」）：
+              要能拖就必须收得到触摸，而 `none`（FLAG_NOT_TOUCHABLE）的窗口**永远收不到触摸**。
+
+              代价（必须知道）：卡片矩形内的点击会被卡片吃掉，后面的东西收不到。
+              ★ 缓解：卡片**默认是 INVISIBLE 的**（只在按键后亮 2.5 秒），
+                不可见的 View 本来就不参与触摸分发 ⇒ **平时完全不挡**。
+              见 [BrightnessModService] 的注释与 README §4.3。
+            -->
+            <meta-data android:name="com.shware.mode.MOD_TOUCH"  android:value="self" />
+            <meta-data android:name="com.shware.mode.MOD_SETTINGS" android:value=".SettingsActivity" />
+            <!-- ★ 图形化 UI 用的可选申报（任务 AP）—— 不写也有合理默认 -->
+            <meta-data android:name="com.shware.mode.MOD_CATEGORY" android:value="display" />
+            <meta-data android:name="com.shware.mode.MOD_ORDER"    android:value="10" />
+            <meta-data android:name="com.shware.mode.MOD_ICON"     android:value="feat_brightness" />
+            <!--
+              ★★★★ 申报「本组件依赖哪个无障碍服务」（任务 AP · 2026-09-14）。
+
+              为什么必须写：无障碍登记会被 `am force-stop <包名>` **整个抹掉**，
+              而本 mod 的服务**还在前台跑** ⇒ 界面状态点还是绿的、**可按键根本没人在听**
+              ⇒ ★ **功能静默失效，用户只能靠"感觉不对"发现**。2026-09-14 真实发生过。
+
+              申报之后宿主能做两件事：
+                ① 界面在卡片上**显式打一条琥珀告警**（不再静默）
+                ② 宿主用 Shizuku（shell 身份）**追加式**把这道门重新打开（自愈）
+
+              ⚠️ 值写 `.Xxx` 缩写或全限定名都行（与 `MOD_SETTINGS` 同一套约定）。
+            -->
+            <meta-data android:name="com.shware.mode.MOD_A11Y" android:value=".KeyFilterService" />
+            <meta-data android:name="com.shware.mode.MOD_ENABLED_BY_DEFAULT" android:value="false" />
+        </service>
+
+        <!-- ================= ② ★ 按键过滤器：真正干活的那个 =================
+             它是【系统绑定】的，不依赖宿主是否拉起本 mod
+             ⇒ 只要在无障碍里启用了，插上键盘就能用。 -->
+        <service
+            android:name=".KeyFilterService"
+            android:process=":mod_brightness"
+            android:exported="true"
+            android:label="@string/acc_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_keyfilter" />
+        </service>
+
+        <!-- ================= ③ 设置 / 自检界面 ================= -->
+        <activity
+            android:process=":mod_brightness"
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop">
+        </activity>
+
+    </application>
+
+</manifest>

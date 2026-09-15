@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ 性能探针（任务 AK）—— 诊断工具，不是产品组件。
+  ⚠️ `targetSdkVersion = 27` 是**故意的**：该版本豁免隐藏 API 限制，
+     这样才能从 app 身份反射调用 `android.util.BoostFramework`。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ★ 视频解码基准要读测试视频 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <application
+        android:allowBackup="false"
+        android:largeHeap="true"
+        android:label="性能探针"
+        android:supportsRtl="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="性能探针">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          ★★★★★ 对外 API 的**验收测试**（任务 AP / AP7）。
+
+          放在这里是因为本模块是**另一个应用**（`com.shware.perfprobe`）——
+          只有跨应用调用才会真正走 binder 序列化。
+          放在 Powertoys 自己的工程台里测会拿到本地 stub，**什么都验证不到**。
+        -->
+        <activity
+            android:name=".ApiClientActivity"
+            android:exported="true"
+            android:label="Powertoys API 客户端" />
+
+        <!-- ★★ 功耗基准（任务 AK4）—— 独立 Activity：只做采样，不跑别的测试，免污染 -->
+        <activity
+            android:name=".PowerBenchActivity"
+            android:exported="true"
+            android:excludeFromRecents="false"
+            android:label="功耗基准" />
+
+        <!-- ★★★ opcode 矩阵（任务 AK6）—— 逐个叠加 opcode，跑同一个突发基准 -->
+        <activity
+            android:name=".OpcodeMatrixActivity"
+            android:exported="true"
+            android:label="opcode 矩阵" />
+
+        <!-- ★★★★ 档位功耗对照（任务 AK7）—— 无锁 / 均衡 / 强力 三方空闲对照 -->
+        <activity
+            android:name=".TierPowerActivity"
+            android:exported="true"
+            android:label="档位功耗对照" />
+
+        <!-- ★★★★★ GPU 探针（任务 AM）—— 扫 QTI perf HAL 的 GPU major 组 -->
+        <activity
+            android:name=".GpuProbeActivity"
+            android:exported="true"
+            android:label="GPU 探针" />
+
+        <!-- ★★★★★ 视频解码基准（任务 AN）—— 自己驱动 MediaCodec 量解码 fps -->
+        <activity
+            android:name=".VideoDecodeBenchActivity"
+            android:exported="true"
+            android:label="视频解码基准" />
+        <!-- ★★★★★ 软解功耗对照（任务 AN 第 2 步）—— 持续 AV1 软解 × 三配置 -->
+        <activity
+            android:name=".DecodePowerActivity"
+            android:exported="true"
+            android:label="软解功耗对照" />
+        <!-- ★★★★★ 机理诊断（任务 AN 第 3 步）—— 看每簇实际交付了多少周期 -->
+        <activity
+            android:name=".DecodeDiagActivity"
+            android:exported="true"
+            android:label="机理诊断" />
+        <!-- ★★★★★ 内存带宽基准（任务 AN 第 4 步）—— 纠正 AK6 的方法论错误 -->
+        <activity
+            android:name=".MemBenchActivity"
+            android:exported="true"
+            android:label="内存带宽基准" />
+        <!-- ★★★★★ 纯解码负载（任务 AN 第 5 步）—— 给 shell 侧读 schedstat 用 -->
+        <activity
+            android:name=".DecodeLoadActivity"
+            android:exported="true"
+            android:label="解码负载" />
+    </application>
+</manifest>

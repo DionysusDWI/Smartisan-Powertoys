@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ 分组标题行（任务 AP）。
+
+  ```
+  [图标] 显示   2
+  ```
+
+  ★★ 这里的图标用**扁平**那套（`cat_*`），而卡片里用**拟物化**（`feat_*`）——
+  这是用户 2026-09-14 定的「混用」规则，分工是：
+
+  | 用在哪 | 风格 | 为什么 |
+  | 分组标题 | **扁平** | 它是**结构性**标识，要克制，不能跟功能图标抢注意力 |
+  | 功能卡片 | **拟物化** | 它是"一个个具体的物件"，拟物化才给得出身份感 |
+
+  ⚠️ `sectionIcon` 默认 `gone` —— 图层管理页（LayerAdapter）也用这个布局，
+     那边不需要图标。谁需要谁自己显示。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal">
+
+    <ImageView
+        android:id="@+id/sectionIcon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginEnd="7dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/sectionTitle"
+        style="@style/PtSectionHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1" />
+</LinearLayout>

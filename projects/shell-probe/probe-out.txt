@@ -1,0 +1,550 @@
+[probe] javac ...
+[probe] d8 ...
+[probe] 构建完成：out/dex/classes.dex
+[probe] 推送 + 运行 ...
+out/dex/classes.dex: 1 file pushed, 0 skipped. 13.0 MB/s (9004 bytes in 0.001s)
+=========== shell 能力探针 ===========
+-- 身份 --
+  uid        = 2000
+  pid        = 13265
+  SELinux    = u:r:shell:s0
+  java.class.path = /data/local/tmp/probe.dex
+-- 服务 activity_task --
+  ✓ binder = android.os.BinderProxy@c636c4c
+  ✓ asInterface = android.app.IActivityTaskManager$Stub$Proxy@1c7495
+-- 服务 package --
+  ✓ binder = android.os.BinderProxy@7e139aa
+  ✓ asInterface = android.content.pm.IPackageManager$Stub$Proxy@df3899b
+-- 服务 window --
+  ✓ binder = android.os.BinderProxy@d810138
+  ✓ asInterface = android.view.IWindowManager$Stub$Proxy@79cc511
+-- IActivityTaskManager 方法表 --
+    activityDestroyed(android.os.IBinder) -> void
+    activityIdle(android.os.IBinder, android.content.res.Configuration, boolean) -> void
+    activityPaused(android.os.IBinder) -> void
+    activityRelaunched(android.os.IBinder) -> void
+    activityResumed(android.os.IBinder) -> void
+    activitySlept(android.os.IBinder) -> void
+    activityStopped(android.os.IBinder, android.os.Bundle, android.os.PersistableBundle, CharSequence) -> void
+    activityTopResumedStateLost() -> void
+    addAppTask(android.os.IBinder, android.content.Intent, android.app.ActivityManager$TaskDescription, android.graphics.Bitmap) -> int
+    alwaysShowUnsupportedCompileSdkWarning(android.content.ComponentName) -> void
+    asBinder() -> android.os.IBinder
+    cancelRecentsAnimation(boolean) -> void
+    cancelTaskWindowTransition(int) -> void
+    clearLaunchParamsForPackages(java.util.List) -> void
+    convertFromTranslucent(android.os.IBinder) -> boolean
+    convertToTranslucent(android.os.IBinder, android.os.Bundle) -> boolean
+    dismissKeyguard(android.os.IBinder, com.android.internal.policy.IKeyguardDismissCallback, CharSequence) -> void
+    dismissPip(boolean, int) -> void
+    dismissSplitScreenMode(boolean) -> void
+    enterPictureInPictureMode(android.os.IBinder, android.app.PictureInPictureParams) -> boolean
+    finishActivity(android.os.IBinder, int, android.content.Intent, int) -> boolean
+    finishActivityAffinity(android.os.IBinder) -> boolean
+    finishSubActivity(android.os.IBinder, String, int) -> void
+    finishVoiceTask(android.service.voice.IVoiceInteractionSession) -> void
+    getActivityClassForToken(android.os.IBinder) -> android.content.ComponentName
+    getActivityDisplayId(android.os.IBinder) -> int
+    getActivityOptions(android.os.IBinder) -> android.os.Bundle
+    getAllStackInfos() -> java.util.List
+    getAppTaskThumbnailSize() -> android.graphics.Point
+    getAppTasks(String) -> java.util.List
+    getAssistContextExtras(int) -> android.os.Bundle
+    getCallingActivity(android.os.IBinder) -> android.content.ComponentName
+    getCallingPackage(android.os.IBinder) -> String
+    getDeviceConfigurationInfo() -> android.content.pm.ConfigurationInfo
+    getFilteredTasks(int, int, int) -> java.util.List
+    getFocusedStackInfo() -> android.app.ActivityManager$StackInfo
+    getFrontActivityScreenCompatMode() -> int
+    getInterfaceDescriptor() -> String
+    getLastResumedActivityUserId() -> int
+    getLaunchedFromPackage(android.os.IBinder) -> String
+    getLaunchedFromUid(android.os.IBinder) -> int
+    getLockTaskModeState() -> int
+    getMaxNumPictureInPictureActions(android.os.IBinder) -> int
+    getPackageAskScreenCompat(String) -> boolean
+    getPackageForToken(android.os.IBinder) -> String
+    getPackageScreenCompatMode(String) -> int
+    getRecentTasks(int, int, int) -> android.content.pm.ParceledListSlice
+    getRequestedOrientation(android.os.IBinder) -> int
+    getStackInfo(int, int) -> android.app.ActivityManager$StackInfo
+    getTaskBounds(int) -> android.graphics.Rect
+    getTaskDescription(int) -> android.app.ActivityManager$TaskDescription
+    getTaskDescriptionIcon(String, int) -> android.graphics.Bitmap
+    getTaskForActivity(android.os.IBinder, boolean) -> int
+    getTaskSnapshot(int, boolean) -> android.app.ActivityManager$TaskSnapshot
+    getTasks(int) -> java.util.List
+    getUriPermissionOwnerForActivity(android.os.IBinder) -> android.os.IBinder
+    isActivityStartAllowedOnDisplay(int, android.content.Intent, String, int) -> boolean
+    isAssistDataAllowedOnCurrentActivity() -> boolean
+    isImmersive(android.os.IBinder) -> boolean
+    isInLockTaskMode() -> boolean
+    isInMultiWindowMode(android.os.IBinder) -> boolean
+    isInPictureInPictureMode(android.os.IBinder) -> boolean
+    isRootVoiceInteraction(android.os.IBinder) -> boolean
+    isTopActivityImmersive() -> boolean
+    isTopOfTask(android.os.IBinder) -> boolean
+    keyguardGoingAway(int) -> void
+    launchAssistIntent(android.content.Intent, int, String, int, android.os.Bundle) -> boolean
+    moveActivityTaskToBack(android.os.IBinder, boolean) -> boolean
+    moveStackToDisplay(int, int) -> void
+    moveTaskToFront(android.app.IApplicationThread, String, int, int, android.os.Bundle) -> void
+    moveTaskToStack(int, int, boolean) -> void
+    moveTasksToFullscreenStack(int, boolean) -> void
+    moveTopActivityToPinnedStack(int, android.graphics.Rect) -> boolean
+    navigateUpTo(android.os.IBinder, android.content.Intent, int, android.content.Intent) -> boolean
+    notifyActivityDrawn(android.os.IBinder) -> void
+    notifyEnterAnimationComplete(android.os.IBinder) -> void
+    notifyLaunchTaskBehindComplete(android.os.IBinder) -> void
+    notifyPinnedStackAnimationEnded() -> void
+    notifyPinnedStackAnimationStarted() -> void
+    offsetPinnedStackBounds(int, android.graphics.Rect, int, int, int) -> void
+    onBackPressedOnTaskRoot(android.os.IBinder, android.app.IRequestFinishCallback) -> void
+    overridePendingTransition(android.os.IBinder, String, int, int) -> void
+    positionTaskInStack(int, int, int) -> void
+    registerRemoteAnimationForNextActivityStart(String, android.view.RemoteAnimationAdapter) -> void
+    registerRemoteAnimations(android.os.IBinder, android.view.RemoteAnimationDefinition) -> void
+    registerRemoteAnimationsForDisplay(int, android.view.RemoteAnimationDefinition) -> void
+    registerTaskStackListener(android.app.ITaskStackListener) -> void
+    releaseActivityInstance(android.os.IBinder) -> boolean
+    releaseSomeActivities(android.app.IApplicationThread) -> void
+    removeAllVisibleRecentTasks() -> void
+    removeStack(int) -> void
+    removeStacksInWindowingModes(int[]) -> void
+    removeStacksWithActivityTypes(int[]) -> void
+    removeTask(int) -> boolean
+    removeTaskWithFlag(int, int) -> boolean
+    reportActivityFullyDrawn(android.os.IBinder, boolean) -> void
+    reportAssistContextExtras(android.os.IBinder, android.os.Bundle, android.app.assist.AssistStructure, android.app.assist.AssistContent, android.net.Uri) -> void
+    reportSizeConfigurations(android.os.IBinder, int[], int[], int[]) -> void
+    requestAssistContextExtras(int, android.app.IAssistDataReceiver, android.os.Bundle, android.os.IBinder, boolean, boolean) -> boolean
+    requestAutofillData(android.app.IAssistDataReceiver, android.os.Bundle, android.os.IBinder, int) -> boolean
+    requestStartActivityPermissionToken(android.os.IBinder) -> android.os.IBinder
+    resizeDockedStack(android.graphics.Rect, android.graphics.Rect, android.graphics.Rect, android.graphics.Rect, android.graphics.Rect) -> void
+    resizePinnedStack(android.graphics.Rect, android.graphics.Rect) -> void
+    resizeStack(int, android.graphics.Rect, boolean, boolean, boolean, int) -> void
+    resizeTask(int, android.graphics.Rect, int) -> void
+    restartActivityProcessIfVisible(android.os.IBinder) -> void
+    resumeAppSwitches() -> void
+    setActivityController(android.app.IActivityController, boolean) -> void
+    setDisablePreviewScreenshots(android.os.IBinder, boolean) -> void
+    setDisplayToSingleTaskInstance(int) -> void
+    setFocusedStack(int) -> void
+    setFocusedTask(int) -> void
+    setFrontActivityScreenCompatMode(int) -> void
+    setImmersive(android.os.IBinder, boolean) -> void
+    setInheritShowWhenLocked(android.os.IBinder, boolean) -> void
+    setLockScreenShown(boolean, boolean) -> void
+    setPackageAskScreenCompat(String, boolean) -> void
+    setPackageScreenCompatMode(String, int) -> void
+    setPersistentVrThread(int) -> void
+    setPictureInPictureParams(android.os.IBinder, android.app.PictureInPictureParams) -> void
+    setRequestedOrientation(android.os.IBinder, int) -> void
+    setShowWhenLocked(android.os.IBinder, boolean) -> void
+    setSplitScreenResizing(boolean) -> void
+    setTaskDescription(android.os.IBinder, android.app.ActivityManager$TaskDescription) -> void
+    setTaskResizeable(int, int) -> void
+    setTaskWindowingMode(int, int, boolean) -> void
+    setTaskWindowingModeSplitScreenPrimary(int, int, boolean, boolean, android.graphics.Rect, boolean) -> boolean
+    setTurnScreenOn(android.os.IBinder, boolean) -> void
+    setVoiceKeepAwake(android.service.voice.IVoiceInteractionSession, boolean) -> void
+    setVrMode(android.os.IBinder, boolean, android.content.ComponentName) -> int
+    setVrThread(int) -> void
+    shouldUpRecreateTask(android.os.IBinder, String) -> boolean
+    showAssistFromActivity(android.os.IBinder, android.os.Bundle) -> boolean
+    showLockTaskEscapeMessage(android.os.IBinder) -> void
+    startActivities(android.app.IApplicationThread, String, android.content.Intent[], String[], android.os.IBinder, android.os.Bundle, int) -> int
+    startActivity(android.app.IApplicationThread, String, android.content.Intent, String, android.os.IBinder, String, int, int, android.app.ProfilerInfo, android.os.Bundle) -> int
+    startActivityAndWait(android.app.IApplicationThread, String, android.content.Intent, String, android.os.IBinder, String, int, int, android.app.ProfilerInfo, android.os.Bundle, int) -> android.app.WaitResult
+    startActivityAsCaller(android.app.IApplicationThread, String, android.content.Intent, String, android.os.IBinder, String, int, int, android.app.ProfilerInfo, android.os.Bundle, android.os.IBinder, boolean, int) -> int
+    startActivityAsUser(android.app.IApplicationThread, String, android.content.Intent, String, android.os.IBinder, String, int, int, android.app.ProfilerInfo, android.os.Bundle, int) -> int
+    startActivityFromRecents(int, android.os.Bundle) -> int
+    startActivityIntentSender(android.app.IApplicationThread, android.content.IIntentSender, android.os.IBinder, android.content.Intent, String, android.os.IBinder, String, int, int, int, android.os.Bundle) -> int
+    startActivityWithConfig(android.app.IApplicationThread, String, android.content.Intent, String, android.os.IBinder, String, int, int, android.content.res.Configuration, android.os.Bundle, int) -> int
+    startAssistantActivity(String, int, int, android.content.Intent, String, android.os.Bundle, int) -> int
+    startInPlaceAnimationOnFrontMostApplication(android.os.Bundle) -> void
+    startLocalVoiceInteraction(android.os.IBinder, android.os.Bundle) -> void
+    startLockTaskModeByToken(android.os.IBinder) -> void
+    startNextMatchingActivity(android.os.IBinder, android.content.Intent, android.os.Bundle) -> boolean
+    startRecentsActivity(android.content.Intent, android.app.IAssistDataReceiver, android.view.IRecentsAnimationRunner) -> void
+    startSystemLockTaskMode(int) -> void
+    startVoiceActivity(String, int, int, android.content.Intent, String, android.service.voice.IVoiceInteractionSession, com.android.internal.app.IVoiceInteractor, int, android.app.ProfilerInfo, android.os.Bundle, int) -> int
+    stopAppSwitches() -> void
+    stopLocalVoiceInteraction(android.os.IBinder) -> void
+    stopLockTaskModeByToken(android.os.IBinder) -> void
+    stopSystemLockTaskMode() -> void
+    supportsLocalVoiceInteraction() -> boolean
+    suppressResizeConfigChanges(boolean) -> void
+    toggleFreeformWindowingMode(android.os.IBinder) -> void
+    unhandledBack() -> void
+    unregisterTaskStackListener(android.app.ITaskStackListener) -> void
+    updateConfiguration(android.content.res.Configuration) -> boolean
+    updateDisplayOverrideConfiguration(android.content.res.Configuration, int) -> boolean
+    updateLockTaskFeatures(int, int) -> void
+    updateLockTaskPackages(int, String[]) -> void
+    willActivityBeVisible(android.os.IBinder) -> boolean
+-- IPackageManager 方法表 --
+    activitySupportsIntent(android.content.ComponentName, android.content.Intent, String) -> boolean
+    addCrossProfileIntentFilter(android.content.IntentFilter, String, int, int, int) -> void
+    addOnPermissionsChangeListener(android.content.pm.IOnPermissionsChangeListener) -> void
+    addPermission(android.content.pm.PermissionInfo) -> boolean
+    addPermissionAsync(android.content.pm.PermissionInfo) -> boolean
+    addPersistentPreferredActivity(android.content.IntentFilter, android.content.ComponentName, int) -> void
+    addPreferredActivity(android.content.IntentFilter, int, android.content.ComponentName[], android.content.ComponentName, int) -> void
+    addWhitelistedRestrictedPermission(String, String, int, int) -> boolean
+    asBinder() -> android.os.IBinder
+    canForwardTo(android.content.Intent, String, int, int) -> boolean
+    canRequestPackageInstalls(String, int) -> boolean
+    canonicalToCurrentPackageNames(String[]) -> String[]
+    checkPackageStartable(String, int) -> void
+    checkPermission(String, String, int) -> int
+    checkSignatures(String, String) -> int
+    checkUidPermission(String, int) -> int
+    checkUidSignatures(int, int) -> int
+    clearApplicationProfileData(String) -> void
+    clearApplicationUserData(String, android.content.pm.IPackageDataObserver, int) -> void
+    clearCrossProfileIntentFilters(int, String) -> void
+    clearPackagePersistentPreferredActivities(String, int) -> void
+    clearPackagePreferredActivities(String) -> void
+    compileLayouts(String) -> boolean
+    currentToCanonicalPackageNames(String[]) -> String[]
+    deleteApplicationCacheFiles(String, android.content.pm.IPackageDataObserver) -> void
+    deleteApplicationCacheFilesAsUser(String, int, android.content.pm.IPackageDataObserver) -> void
+    deletePackageAsUser(String, int, android.content.pm.IPackageDeleteObserver, int, int) -> void
+    deletePackageVersioned(android.content.pm.VersionedPackage, android.content.pm.IPackageDeleteObserver2, int, int) -> void
+    deletePreloadsFileCache() -> void
+    dumpProfiles(String) -> void
+    enterSafeMode() -> void
+    extendVerificationTimeout(int, int, long) -> void
+    findPersistentPreferredActivity(android.content.Intent, int) -> android.content.pm.ResolveInfo
+    finishPackageInstall(int, boolean) -> void
+    flushPackageRestrictionsAsUser(int) -> void
+    forceDexOpt(String) -> void
+    freeStorage(String, long, int, android.content.IntentSender) -> void
+    freeStorageAndNotify(String, long, int, android.content.pm.IPackageDataObserver) -> void
+    getActivityInfo(android.content.ComponentName, int, int) -> android.content.pm.ActivityInfo
+    getAllIntentFilters(String) -> android.content.pm.ParceledListSlice
+    getAllPackages() -> java.util.List
+    getAllPermissionGroups(int) -> android.content.pm.ParceledListSlice
+    getAppOpPermissionPackages(String) -> String[]
+    getAppPredictionServicePackageName() -> String
+    getApplicationEnabledSetting(String, int) -> int
+    getApplicationHiddenSettingAsUser(String, int) -> boolean
+    getApplicationInfo(String, int, int) -> android.content.pm.ApplicationInfo
+    getArtManager() -> android.content.pm.dex.IArtManager
+    getAttentionServicePackageName() -> String
+    getBlockUninstallForUser(String, int) -> boolean
+    getChangedPackages(int, int) -> android.content.pm.ChangedPackages
+    getComponentEnabledSetting(android.content.ComponentName, int) -> int
+    getCustomizedStatusBarPackagesState(boolean) -> java.util.List
+    getDeclaredSharedLibraries(String, int, int) -> android.content.pm.ParceledListSlice
+    getDefaultAppsBackup(int) -> byte[]
+    getDefaultBrowserPackageName(int) -> String
+    getFlagsForUid(int) -> int
+    getHarmfulAppWarning(String, int) -> CharSequence
+    getHomeActivities(java.util.List) -> android.content.ComponentName
+    getISmtEx() -> android.content.pm.IPackageManagerSmtEx
+    getIncidentReportApproverPackageName() -> String
+    getInstallLocation() -> int
+    getInstallReason(String, int) -> int
+    getInstalledApplications(int, int) -> android.content.pm.ParceledListSlice
+    getInstalledModules(int) -> java.util.List
+    getInstalledPackages(int, int) -> android.content.pm.ParceledListSlice
+    getInstallerPackageName(String) -> String
+    getInstantAppAndroidId(String, int) -> String
+    getInstantAppCookie(String, int) -> byte[]
+    getInstantAppIcon(String, int) -> android.graphics.Bitmap
+    getInstantAppInstallerComponent() -> android.content.ComponentName
+    getInstantAppResolverComponent() -> android.content.ComponentName
+    getInstantAppResolverSettingsComponent() -> android.content.ComponentName
+    getInstantApps(int) -> android.content.pm.ParceledListSlice
+    getInstrumentationInfo(android.content.ComponentName, int) -> android.content.pm.InstrumentationInfo
+    getIntentFilterVerificationBackup(int) -> byte[]
+    getIntentFilterVerifications(String) -> android.content.pm.ParceledListSlice
+    getIntentVerificationStatus(String, int) -> int
+    getInterfaceDescriptor() -> String
+    getKeySetByAlias(String, String) -> android.content.pm.KeySet
+    getLastChosenActivity(android.content.Intent, String, int) -> android.content.pm.ResolveInfo
+    getModuleInfo(String, int) -> android.content.pm.ModuleInfo
+    getMoveStatus(int) -> int
+    getNameForUid(int) -> String
+    getNamesForUids(int[]) -> String[]
+    getPackageGids(String, int, int) -> int[]
+    getPackageInfo(String, int, int) -> android.content.pm.PackageInfo
+    getPackageInfoVersioned(android.content.pm.VersionedPackage, int, int) -> android.content.pm.PackageInfo
+    getPackageInstaller() -> android.content.pm.IPackageInstaller
+    getPackageSizeInfo(String, int, android.content.pm.IPackageStatsObserver) -> void
+    getPackageUid(String, int, int) -> int
+    getPackagesForUid(int) -> String[]
+    getPackagesHoldingPermissions(String[], int, int) -> android.content.pm.ParceledListSlice
+    getPermissionControllerPackageName() -> String
+    getPermissionFlags(String, String, int) -> int
+    getPermissionGroupInfo(String, int) -> android.content.pm.PermissionGroupInfo
+    getPermissionInfo(String, String, int) -> android.content.pm.PermissionInfo
+    getPersistentApplications(int) -> android.content.pm.ParceledListSlice
+    getPreferredActivities(java.util.List, java.util.List, String) -> int
+    getPreferredActivityBackup(int) -> byte[]
+    getPrivateFlagsForUid(int) -> int
+    getProviderInfo(android.content.ComponentName, int, int) -> android.content.pm.ProviderInfo
+    getReceiverInfo(android.content.ComponentName, int, int) -> android.content.pm.ActivityInfo
+    getRuntimePermissionsVersion(int) -> int
+    getServiceInfo(android.content.ComponentName, int, int) -> android.content.pm.ServiceInfo
+    getServicesSystemSharedLibraryPackageName() -> String
+    getSharedLibraries(String, int, int) -> android.content.pm.ParceledListSlice
+    getSharedSystemSharedLibraryPackageName() -> String
+    getSigningKeySet(String) -> android.content.pm.KeySet
+    getSuspendedPackageAppExtras(String, int) -> android.os.PersistableBundle
+    getSystemAvailableFeatures() -> android.content.pm.ParceledListSlice
+    getSystemCaptionsServicePackageName() -> String
+    getSystemSharedLibraryNames() -> String[]
+    getSystemTextClassifierPackageName() -> String
+    getUidForSharedUser(String) -> int
+    getUnsuspendablePackagesForUser(String[], int) -> String[]
+    getVerifierDeviceIdentity() -> android.content.pm.VerifierDeviceIdentity
+    getWellbeingPackageName() -> String
+    getWhitelistedRestrictedPermissions(String, int, int) -> java.util.List
+    grantDefaultPermissionsToActiveLuiApp(String, int) -> void
+    grantDefaultPermissionsToEnabledCarrierApps(String[], int) -> void
+    grantDefaultPermissionsToEnabledImsServices(String[], int) -> void
+    grantDefaultPermissionsToEnabledTelephonyDataServices(String[], int) -> void
+    grantRuntimePermission(String, String, int) -> void
+    hasSigningCertificate(String, byte[], int) -> boolean
+    hasSystemFeature(String, int) -> boolean
+    hasSystemUidErrors() -> boolean
+    hasUidSigningCertificate(int, byte[], int) -> boolean
+    installExistingPackageAsUser(String, int, int, int, java.util.List) -> int
+    isDeviceUpgrading() -> boolean
+    isFirstBoot() -> boolean
+    isInstantApp(String, int) -> boolean
+    isOnlyCoreApps() -> boolean
+    isPackageAvailable(String, int) -> boolean
+    isPackageDeviceAdminOnAnyUser(String) -> boolean
+    isPackageSignedByKeySet(String, android.content.pm.KeySet) -> boolean
+    isPackageSignedByKeySetExactly(String, android.content.pm.KeySet) -> boolean
+    isPackageStateProtected(String, int) -> boolean
+    isPackageSuspendedForUser(String, int) -> boolean
+    isPermissionEnforced(String) -> boolean
+    isPermissionRevokedByPolicy(String, String, int) -> boolean
+    isProtectedBroadcast(String) -> boolean
+    isSafeMode() -> boolean
+    isStorageLow() -> boolean
+    isUidPrivileged(int) -> boolean
+    logAppProcessStartIfNeeded(String, int, String, String, int) -> void
+    movePackage(String, String) -> int
+    movePrimaryStorage(String) -> int
+    notifyDexLoad(String, java.util.List, java.util.List, String) -> void
+    notifyPackageUse(String, int) -> void
+    notifyPackagesReplacedReceived(String[]) -> void
+    performDexOptMode(String, boolean, String, boolean, boolean, String) -> boolean
+    performDexOptModeSmt(String, boolean, String, boolean, boolean, String, boolean) -> boolean
+    performDexOptSecondary(String, String, boolean) -> boolean
+    performFstrimIfNeeded() -> void
+    queryContentProviders(String, int, int, String) -> android.content.pm.ParceledListSlice
+    queryInstrumentation(String, int) -> android.content.pm.ParceledListSlice
+    queryIntentActivities(android.content.Intent, String, int, int) -> android.content.pm.ParceledListSlice
+    queryIntentActivityOptions(android.content.ComponentName, android.content.Intent[], String[], android.content.Intent, String, int, int) -> android.content.pm.ParceledListSlice
+    queryIntentContentProviders(android.content.Intent, String, int, int) -> android.content.pm.ParceledListSlice
+    queryIntentReceivers(android.content.Intent, String, int, int) -> android.content.pm.ParceledListSlice
+    queryIntentServices(android.content.Intent, String, int, int) -> android.content.pm.ParceledListSlice
+    queryPermissionsByGroup(String, int) -> android.content.pm.ParceledListSlice
+    querySyncProviders(java.util.List, java.util.List) -> void
+    reconcileSecondaryDexFiles(String) -> void
+    registerDexModule(String, String, boolean, android.content.pm.IDexModuleRegisterCallback) -> void
+    registerMoveCallback(android.content.pm.IPackageMoveObserver) -> void
+    removeOnPermissionsChangeListener(android.content.pm.IOnPermissionsChangeListener) -> void
+    removePermission(String) -> void
+    removeWhitelistedRestrictedPermission(String, String, int, int) -> boolean
+    replacePreferredActivity(android.content.IntentFilter, int, android.content.ComponentName[], android.content.ComponentName, int) -> void
+    resetApplicationPreferences(int) -> void
+    resetRuntimePermissions() -> void
+    resolveContentProvider(String, int, int) -> android.content.pm.ProviderInfo
+    resolveIntent(android.content.Intent, String, int, int) -> android.content.pm.ResolveInfo
+    resolveService(android.content.Intent, String, int, int) -> android.content.pm.ResolveInfo
+    restoreDefaultApps(byte[], int) -> void
+    restoreIntentFilterVerification(byte[], int) -> void
+    restorePreferredActivities(byte[], int) -> void
+    revokeDefaultPermissionsFromDisabledTelephonyDataServices(String[], int) -> void
+    revokeDefaultPermissionsFromLuiApps(String[], int) -> void
+    revokeRuntimePermission(String, String, int) -> void
+    runBackgroundDexoptJob(java.util.List) -> boolean
+    sendDeviceCustomizationReadyBroadcast() -> void
+    setApplicationCategoryHint(String, int, String) -> void
+    setApplicationEnabledSetting(String, int, int, int, String) -> void
+    setApplicationHiddenSettingAsUser(String, boolean, int) -> boolean
+    setBlockUninstallForUser(String, boolean, int) -> boolean
+    setComponentEnabledSetting(android.content.ComponentName, int, int, int) -> void
+    setCustomizedStatusBarEnable(String, boolean) -> void
+    setDefaultBrowserPackageName(String, int) -> boolean
+    setDistractingPackageRestrictionsAsUser(String[], int, int) -> String[]
+    setHarmfulAppWarning(String, CharSequence, int) -> void
+    setHomeActivity(android.content.ComponentName, int) -> void
+    setInstallLocation(int) -> boolean
+    setInstallerPackageName(String, String) -> void
+    setInstantAppCookie(String, byte[], int) -> boolean
+    setLastChosenActivity(android.content.Intent, String, int, android.content.IntentFilter, int, android.content.ComponentName) -> void
+    setNotchState(String, int) -> void
+    setPackageActiveState(String, boolean, int) -> void
+    setPackageStoppedState(String, boolean, int) -> void
+    setPackagesSuspendedAsUser(String[], boolean, android.os.PersistableBundle, android.os.PersistableBundle, android.content.pm.SuspendDialogInfo, String, int) -> String[]
+    setPermissionEnforced(String, boolean) -> void
+    setRequiredForSystemUser(String, boolean) -> boolean
+    setRuntimePermissionsVersion(int, int) -> void
+    setSystemAppHiddenUntilInstalled(String, boolean) -> void
+    setSystemAppInstallState(String, boolean, int) -> boolean
+    setUpdateAvailable(String, boolean) -> void
+    shouldShowRequestPermissionRationale(String, String, int) -> boolean
+    systemReady() -> void
+    unregisterMoveCallback(android.content.pm.IPackageMoveObserver) -> void
+    updateIntentVerificationStatus(String, int, int) -> boolean
+    updatePackagesIfNeeded() -> void
+    updatePermissionFlags(String, String, int, int, boolean, int) -> void
+    updatePermissionFlagsForAllApps(int, int, int) -> void
+    verifyIntentFilter(int, int, java.util.List) -> void
+    verifyPendingInstall(int, int) -> void
+-- IWindowManager 方法表 --
+    addWindowToken(android.os.IBinder, int, int) -> void
+    asBinder() -> android.os.IBinder
+    clearForcedDisplayDensityForUser(int, int) -> void
+    clearForcedDisplaySize(int) -> void
+    clearWindowContentFrameStats(android.os.IBinder) -> boolean
+    closeSystemDialogs(String) -> void
+    createInputConsumer(android.os.IBinder, String, int, android.view.InputChannel) -> void
+    destroyInputConsumer(String, int) -> boolean
+    disableKeyguard(android.os.IBinder, String, int) -> void
+    dismissKeyguard(com.android.internal.policy.IKeyguardDismissCallback, CharSequence) -> void
+    dispatchBoomMaskClick(int, int, boolean) -> void
+    dispatchOnStatusBarClick() -> void
+    dontOverrideDisplayInfo(int) -> void
+    enableScreenIfNeeded() -> void
+    endProlongedAnimations() -> void
+    executeAppTransition() -> void
+    exitKeyguardSecurely(android.view.IOnKeyguardExitResult) -> void
+    freezeDisplayRotation(int, int) -> void
+    freezeRotation(int) -> void
+    getAnimationScale(int) -> float
+    getAnimationScales() -> float[]
+    getBaseDisplayDensity(int) -> int
+    getBaseDisplaySize(int, android.graphics.Point) -> void
+    getCurrentAnimatorScale() -> float
+    getCurrentImeTouchRegion() -> android.graphics.Region
+    getDefaultDisplayRotation() -> int
+    getDockedStackSide() -> int
+    getHomeTaskId() -> int
+    getHomeTaskSnapshot() -> android.app.ActivityManager$TaskSnapshot
+    getIWindowManagerSmtEx() -> android.view.IWindowManagerSmtEx
+    getInitialDisplayDensity(int) -> int
+    getInitialDisplaySize(int, android.graphics.Point) -> void
+    getInterfaceDescriptor() -> String
+    getNavBarPosition(int) -> int
+    getPreferredOptionsPanelGravity(int) -> int
+    getRemoveContentMode(int) -> int
+    getScreenshotTaskInfo() -> String
+    getSmtTopVisibleAppWindowInfo(int) -> android.os.Bundle
+    getStableInsets(int, android.graphics.Rect) -> void
+    getTopSurface(int) -> android.view.SurfaceControl
+    getWindowContentFrameStats(android.os.IBinder) -> android.view.WindowContentFrameStats
+    getWindowingMode(int) -> int
+    hasNavigationBar(int) -> boolean
+    inKeyguardRestrictedInputMode() -> boolean
+    injectInputAfterTransactionsApplied(android.view.InputEvent, int) -> boolean
+    insertSnippetToLatestFocusEditor(String) -> boolean
+    isDisplayRotationFrozen(int) -> boolean
+    isFocusedWinFullScreen() -> boolean
+    isFooDisplayShowing() -> boolean
+    isKeyguardLocked() -> boolean
+    isKeyguardSecure(int) -> boolean
+    isRotationFrozen() -> boolean
+    isSafeModeEnabled() -> boolean
+    isViewServerRunning() -> boolean
+    isWindowTraceEnabled() -> boolean
+    lockNow(android.os.Bundle) -> void
+    openSession(android.view.IWindowSessionCallback) -> android.view.IWindowSession
+    overridePendingAppTransition(String, int, int, android.os.IRemoteCallback) -> void
+    overridePendingAppTransitionMultiThumbFuture(android.view.IAppTransitionAnimationSpecsFuture, android.os.IRemoteCallback, boolean, int) -> void
+    overridePendingAppTransitionRemote(android.view.RemoteAnimationAdapter, int) -> void
+    prepareAppTransition(int, boolean) -> void
+    reOrderTasks() -> void
+    reenableKeyguard(android.os.IBinder, int) -> void
+    refreshScreenCaptureDisabled(int) -> void
+    registerDisplayFoldListener(android.view.IDisplayFoldListener) -> void
+    registerDockedStackListener(android.view.IDockedStackListener) -> void
+    registerPinnedStackListener(int, android.view.IPinnedStackListener) -> void
+    registerShortcutKey(long, com.android.internal.policy.IShortcutService) -> void
+    registerSystemGestureExclusionListener(android.view.ISystemGestureExclusionListener, int) -> void
+    registerThumbStateChangeListener(android.os.IRemoteCallback) -> void
+    registerWallpaperVisibilityListener(android.view.IWallpaperVisibilityListener, int) -> boolean
+    removeRotationWatcher(android.view.IRotationWatcher) -> void
+    removeWindowToken(android.os.IBinder, int) -> void
+    requestAppKeyboardShortcuts(com.android.internal.os.IResultReceiver, int) -> void
+    requestAssistScreenshot(android.app.IAssistDataReceiver) -> boolean
+    requestUserActivityNotification() -> void
+    screenShotAppWindows(int, android.graphics.Rect, float, int) -> android.graphics.GraphicBuffer
+    screenshotWallpaper() -> android.graphics.Bitmap
+    setAnimationScale(int, float) -> void
+    setAnimationScales(float[]) -> void
+    setDockedStackDividerTouchRegion(android.graphics.Rect) -> void
+    setEventDispatching(boolean) -> void
+    setForceShowSystemBars(boolean) -> void
+    setForcedDisplayDensityForUser(int, int, int) -> void
+    setForcedDisplayScalingMode(int, int) -> void
+    setForcedDisplaySize(int, int, int) -> void
+    setForwardedInsets(int, android.graphics.Insets) -> void
+    setInTouchMode(boolean) -> void
+    setLatestFocusEditor(android.view.WindowId, int) -> void
+    setNavBarVirtualKeyHapticFeedbackEnabled(boolean) -> void
+    setOverscan(int, int, int, int, int) -> void
+    setPipVisibility(boolean) -> void
+    setRecentsVisibility(boolean) -> void
+    setRemoveContentMode(int, int) -> void
+    setResizeDimLayer(boolean, int, float) -> void
+    setShelfHeight(boolean, int) -> void
+    setShouldShowIme(int, boolean) -> void
+    setShouldShowSystemDecors(int, boolean) -> void
+    setShouldShowWithInsecureKeyguard(int, boolean) -> void
+    setStrictModeVisualIndicatorPreference(String) -> void
+    setSwitchingUser(boolean) -> void
+    setWindowingMode(int, int) -> void
+    shouldShowIme(int) -> boolean
+    shouldShowSystemDecors(int) -> boolean
+    shouldShowWithInsecureKeyguard(int) -> boolean
+    showFooDisplay(android.view.WindowId, int, int) -> void
+    showStrictModeViolation(boolean) -> void
+    startFreezingScreen(int, int) -> void
+    startViewServer(int) -> boolean
+    startWindowTrace() -> void
+    statusBarVisibilityChanged(int, int) -> void
+    stopFreezingScreen() -> void
+    stopViewServer() -> boolean
+    stopWindowTrace() -> void
+    syncInputTransactions() -> void
+    thawDisplayRotation(int) -> void
+    thawRotation() -> void
+    transferTouchFocus(android.view.WindowId, android.view.WindowId) -> void
+    unRegisterThumbStateChangeListener(android.os.IRemoteCallback) -> void
+    unregisterDisplayFoldListener(android.view.IDisplayFoldListener) -> void
+    unregisterSystemGestureExclusionListener(android.view.ISystemGestureExclusionListener, int) -> void
+    unregisterWallpaperVisibilityListener(android.view.IWallpaperVisibilityListener, int) -> void
+    updateRotation(boolean, boolean) -> void
+    watchRotation(android.view.IRotationWatcher, int) -> int
+-- 试调 getTasks（只读）--
+    ✓ getTasks(30) 返回 java.util.ArrayList
+      任务数 = 6
+      [0] android.app.ActivityManager$RunningTaskInfo { taskId=44 id=44 displayId=100000 userId=0 topActivity=ComponentInfo{com.android.browser/org.chromium.chrome.browser.ChromeTabbedActivity} baseActivity=ComponentInfo{com.android.browser/org.chromium.chrome.browser.ChromeTabbedActivity} baseIntent=com.android.browser/org.chromium.chrome.browser.ChromeTabbedActivity isRunning=true numActivities=1 | desc.label=<-> desc.iconName=<->}
+      [1] android.app.ActivityManager$RunningTaskInfo { taskId=2 id=2 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.launcher/com.smartisanos.launcher.Launcher} baseActivity=ComponentInfo{com.smartisanos.launcher/com.smartisanos.launcher.Launcher} baseIntent=com.smartisanos.launcher/.Launcher isRunning=true numActivities=1 | desc.label=<-> desc.iconName=<->}
+      [2] android.app.ActivityManager$RunningTaskInfo { taskId=12 id=12 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.security/com.smartisanos.security.RadioPermissions} baseActivity=ComponentInfo{com.android.settings/com.android.settings.Settings} baseIntent=com.android.settings/.Settings isRunning=true numActivities=3 | desc.label=<-> desc.iconName=<->}
+      [3] android.app.ActivityManager$RunningTaskInfo { taskId=35 id=35 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.security/com.smartisanos.security.PermissionsActivity} baseActivity=ComponentInfo{com.smartisanos.security/com.smartisanos.security.PermissionsActivity} baseIntent=com.smartisanos.security/.PermissionsActivity isRunning=true numActivities=1 | desc.label=<-> desc.iconName=<->}
+      [4] android.app.ActivityManager$RunningTaskInfo { taskId=5 id=5 displayId=0 userId=0 topActivity=ComponentInfo{com.ai.assistance.operit/com.ai.assistance.operit.ui.main.MainActivity} baseActivity=ComponentInfo{com.ai.assistance.operit/com.ai.assistance.operit.ui.main.MainActivity} baseIntent=com.ai.assistance.operit/.ui.main.MainActivity isRunning=true numActivities=1 | desc.label=<-> desc.iconName=<->}
+      [5] android.app.ActivityManager$RunningTaskInfo { taskId=7 id=7 displayId=0 userId=0 topActivity=ComponentInfo{com.fbclient.app/com.follow.clash.MainActivity} baseActivity=ComponentInfo{com.fbclient.app/com.follow.clash.MainActivity} baseIntent=com.fbclient.app/com.follow.clash.MainActivity isRunning=true numActivities=1 | desc.label=<-> desc.iconName=<->}
+-- 试调 getAllStackInfos（只读）--
+    ✓ stack 数 = 7
+      android.app.ActivityManager$StackInfo { stackId=0 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.launcher/com.smartisanos.launcher.Launcher} taskIds=[I@8772477 bounds=Rect(0, 0 - 1080, 2340) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=10 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.security/com.smartisanos.security.RadioPermissions} taskIds=[I@2e0f8e4 bounds=Rect(0, 0 - 1080, 2340) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=33 displayId=0 userId=0 topActivity=ComponentInfo{com.smartisanos.security/com.smartisanos.security.PermissionsActivity} taskIds=[I@9f7a14d bounds=Rect(0, 0 - 1080, 2340) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=3 displayId=0 userId=0 topActivity=ComponentInfo{com.ai.assistance.operit/com.ai.assistance.operit.ui.main.MainActivity} taskIds=[I@235402 bounds=Rect(0, 0 - 1080, 2340) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=5 displayId=0 userId=0 topActivity=ComponentInfo{com.fbclient.app/com.follow.clash.MainActivity} taskIds=[I@e2f9113 bounds=Rect(0, 0 - 1080, 2340) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=42 displayId=100000 userId=0 topActivity=ComponentInfo{com.android.browser/org.chromium.chrome.browser.ChromeTabbedActivity} taskIds=[I@26bf50 bounds=Rect(0, 0 - 2160, 1440) windowingMode=<-> activityType=<-> }
+      android.app.ActivityManager$StackInfo { stackId=9 displayId=100000 userId=0 topActivity=ComponentInfo{com.smartisanos.desktop/com.smartisanos.desktop.Desktop} taskIds=[I@6aa0549 bounds=Rect(0, 0 - 2160, 1440) windowingMode=<-> activityType=<-> }
+-- 试调 getInstalledPackages（只读）--
+    ✓ 返回 android.content.pm.ParceledListSlice
+      包数 = 300
+=========== 探针结束 ===========

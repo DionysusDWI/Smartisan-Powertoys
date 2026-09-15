@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ 关键：canRequestFilterKeyEvents="true"
+  没有它，onKeyEvent 收不到任何键 —— 整个第 5 件事就无从谈起。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRequestFilterKeyEvents="true"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/meta_key_service_desc"
+    android:notificationTimeout="0" />

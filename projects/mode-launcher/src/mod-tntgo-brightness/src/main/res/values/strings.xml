@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TNT GO 亮度</string>
+    <string name="acc_label">TNT GO 亮度键</string>
+
+    <!-- 这段文字会原样显示在「设置 → 无障碍」的列表里 —— 必须说清楚它为什么需要无障碍 -->
+    <string name="acc_desc">接管 TNT GO 键盘上的两个亮度键。\n\nTNT GO 的背光在本机走的是一条死链路，系统收到亮度键只会弹「暂不支持该设备的亮度调节」。本服务抢先接住这两个键，改用 USB 串口的 AT+BKL 直接把背光调起来。\n\n★ 不会读取屏幕内容、不会抢焦点，只处理这两个按键。</string>
+</resources>

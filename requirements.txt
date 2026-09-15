@@ -1,0 +1,24 @@
+# Smartisan-TNT-Secondary — Python 分析环境
+#
+# 安装（工作区根目录）:
+#     python -m venv .venv
+#     ./.venv/Scripts/python.exe -m pip install -r requirements.txt
+#
+# 说明:
+#   * 全部为预编译 wheel 或纯 Python，**不需要 Visual Studio Build Tools**。
+#     lief 走 cp312-abi3 wheel（Python 3.13 兼容）；capstone 是 py3-none-win_amd64。
+#   * 不要加 --no-binary，否则会退化成源码编译。
+#   * 已刻意不装 apkutils：版本陈旧、与 androguard 的 pin 冲突，且功能被 androguard 覆盖。
+
+# --- APK / DEX / smali 分析 ---
+androguard==4.1.4          # APK/DEX 分析、AXML、resources.arsc 解析
+pyaxmlparser==0.3.31       # 轻量读 AndroidManifest.xml（比 androguard 启动快）
+lief==1.0.0                # ELF/PE 解析（libsmartisan-tnt.so、.oat/.vdex 结构）
+capstone==5.0.9            # ARM64 反汇编（native 库）
+
+# --- 支撑库 ---
+lxml==6.1.3                # XML 解析（解码后的 manifest / 资源）
+networkx==3.6.1            # 类引用图 / xref 分析
+jinja2==3.1.6              # 报告模板
+requests==2.34.2           # 抓文档 / 调 ASR API
+pytest==9.1.1              # 测试

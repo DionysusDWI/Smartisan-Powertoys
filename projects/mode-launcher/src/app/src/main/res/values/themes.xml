@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ Smartisan Powertoys 主题（任务 AP）。
+
+  用 Material3 而不是 AppCompat —— 卡片、开关、按钮全是现成的，
+  不再手拼 LinearLayout（"界面过于工程化"有一半来自这里）。
+
+  ⚠️ Theme.Mode 这个名字被 MainActivity（工程台）和 mod 的设置页共用，
+     所以它必须保持可用 —— 只换 parent 与配色，不改名字。
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <style name="Theme.Mode" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/pt_primary</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">@color/pt_primary</item>
+        <item name="colorOnPrimaryContainer">#FFFFFF</item>
+
+        <item name="colorSecondary">@color/pt_accent</item>
+        <item name="colorOnSecondary">@color/pt_ink</item>
+
+        <item name="colorSurface">@color/pt_surface</item>
+        <item name="colorOnSurface">@color/pt_ink</item>
+        <item name="colorSurfaceVariant">@color/pt_surface_alt</item>
+        <item name="colorOnSurfaceVariant">@color/pt_ink_soft</item>
+
+        <item name="colorOutline">@color/pt_outline</item>
+
+        <item name="android:colorBackground">@color/pt_bg</item>
+        <item name="colorOnBackground">@color/pt_ink</item>
+
+        <item name="colorError">@color/pt_state_error</item>
+
+        <!-- ★ 关掉 Material3 的动态取色 —— A12+ 上会用壁纸色，
+             那会让整套配色（和图标）对不上。坚果 A10 本来就没有，这里写明是防将来迁移。 -->
+        <item name="dynamicColorThemeOverlay" tools:targetApi="31">@null</item>
+        <item name="android:statusBarColor">@color/pt_bg</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
+    </style>
+
+    <!-- 卡片：轻描边、无重阴影 —— 与图标的"柔和"一致 -->
+    <style name="PtCard" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardCornerRadius">14dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/pt_outline</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardBackgroundColor">@color/pt_surface</item>
+    </style>
+
+    <style name="PtSectionHeader">
+        <item name="android:textColor">@color/pt_ink_soft</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+</resources>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ MOD：手机侧系统性能数据窗口（契约见 :app 的 com.shware.mode.mod.ModContract）。
+
+  ⚠️ 装完还有一步 adb 干不了：去「手机管理 → 权限管理 → 手机性能 → 悬浮窗」打开开关。
+     （`appops set … SYSTEM_ALERT_WINDOW allow` 只过 Android 那道门）
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="true"
+        android:label="手机性能"
+        android:supportsRtl="true">
+
+        <service
+            android:name=".PerfMonService"
+            android:process=":mod_perfmon"
+            android:exported="true"
+            android:label="手机性能"
+            android:foregroundServiceType="specialUse">
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MODE launcher mod: phone-side performance overlay" />
+
+            <!-- ① 锚点 action -->
+            <intent-filter>
+                <action android:name="com.shware.mode.action.MOD" />
+            </intent-filter>
+
+            <!-- ② 申报信息 -->
+            <meta-data android:name="com.shware.mode.MOD_API"    android:value="1" />
+            <meta-data android:name="com.shware.mode.MOD_ID"     android:value="perf.mon" />
+            <meta-data android:name="com.shware.mode.MOD_NAME"   android:value="手机性能" />
+            <meta-data android:name="com.shware.mode.MOD_DESC"   android:value="TNT 运行时在手机屏显示内存/CPU/温度等（纯展示）" />
+            <!-- ★★ phone = 画在手机屏(0) —— 这是第一个 phone 目标的组件 -->
+            <meta-data android:name="com.shware.mode.MOD_TARGET" android:value="phone" />
+            <!--
+              ★★ 触摸行为：**self**（不是 none）。
+
+              为什么改：用户 2026-09-12 要求「长按可拖动」——
+              **要能拖就必须收得到触摸**，而 `none`（FLAG_NOT_TOUCHABLE）的窗口
+              **永远收不到触摸**，根本无从拖起。
+
+              代价（必须知道）：卡片矩形内的点击会被卡片吃掉，后面的 app 收不到。
+              ⇒ 这符合"有交互的 overlay 不能漏到后面"的规则，
+                 但**缓解办法就是可拖动本身：挡住哪儿就拖走**（见 PerfMonService 类注释）。
+            -->
+            <meta-data android:name="com.shware.mode.MOD_TOUCH"  android:value="self" />
+            <!-- ★ 设置界面（宿主的管理器会多一个「设置」按钮）—— 本 mod 是**首个使用者** -->
+            <meta-data android:name="com.shware.mode.MOD_SETTINGS" android:value=".SettingsActivity" />
+            <!-- ★ 图形化 UI 用的可选申报（任务 AP）—— 不写也有合理默认 -->
+            <meta-data android:name="com.shware.mode.MOD_CATEGORY" android:value="performance" />
+            <meta-data android:name="com.shware.mode.MOD_ORDER"    android:value="20" />
+            <meta-data android:name="com.shware.mode.MOD_ICON"     android:value="feat_perfmon" />
+            <meta-data android:name="com.shware.mode.MOD_ENABLED_BY_DEFAULT" android:value="false" />
+        </service>
+
+        <!--
+          ★ 设置界面（勾选显示哪些指标）。
+
+          ★ 合并成一个 APK 后**不再带 LAUNCHER**（见任务 AP）——
+  入口改为主界面卡片上的「设置」按钮。
+        -->
+        <activity
+            android:process=":mod_perfmon"
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="手机性能"
+            android:launchMode="singleTop">
+        </activity>
+
+    </application>
+
+</manifest>

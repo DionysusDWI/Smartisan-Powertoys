@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ MOD：TNT GO 精准电量 —— 契约申报见下面 <service
+            android:process=":mod_tntgobat"> 块。
+  契约定义在 :app 的 com.shware.mode.mod.ModContract（**故意不共享代码**）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- TNT GO 的 CDC-ACM 串口挂在 USB 主机总线上 -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 画在 TNT 屏上要这个（appop，装完之后用 adb 授一次）：
+           adb shell appops set com.shware.mode SYSTEM_ALERT_WINDOW allow
+         ★ F6 修复：原来这里写的是 `com.shware.mode.mod.tntgo` —— **那个包名根本不存在**。
+           全部 mod 与宿主共用**同一个 APK** `com.shware.mode`（只是不同进程），
+           appops 的粒度是**包**不是进程 ⇒ 照原文敲会报 "Unknown package"。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <application
+        android:allowBackup="true"
+        android:label="TNT GO 电量"
+        android:supportsRtl="true">
+
+        <service
+            android:name=".TntgoBatteryService"
+            android:process=":mod_tntgobat"
+            android:exported="true"
+            android:label="TNT GO 电量"
+            android:foregroundServiceType="specialUse">
+
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="MODE launcher mod: TNT GO battery overlay" />
+
+            <!-- ① 锚点 action -->
+            <intent-filter>
+                <action android:name="com.shware.mode.action.MOD" />
+            </intent-filter>
+
+            <!-- ② 申报信息 -->
+            <meta-data android:name="com.shware.mode.MOD_API"    android:value="1" />
+            <meta-data android:name="com.shware.mode.MOD_ID"     android:value="tntgo.battery" />
+            <meta-data android:name="com.shware.mode.MOD_NAME"   android:value="TNT GO 电量" />
+            <meta-data android:name="com.shware.mode.MOD_DESC"   android:value="TNT 屏上常驻显示手机 + TNT GO 双电量" />
+            <meta-data android:name="com.shware.mode.MOD_TARGET" android:value="tnt" />
+            <!--
+              ★★★ 任务 AQ：从 `none` 改成 **`self`** —— 用户要求「可以被长按点亮和拖动」。
+
+              `none` : `FLAG_NOT_TOUCHABLE` ⇒ 整块矩形穿透，**收不到任何触摸** ⇒ 拖不动
+              `self` : `FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL` ⇒ **只吃自己矩形内**的点击
+
+              ⚠️ **代价（用户 2026-09-14 §4 已明确接受）**：本 mod 的卡片是**常驻显示**的，
+              所以那块矩形会**一直吃点击**。
+              ★ 缓解手段就是**可拖动本身** —— 挡了就拖走；另外宿主图层管理页也能隐藏它。
+              （亮度 mod 没这个问题，因为它的卡片平时是 INVISIBLE 的。）
+
+              ⚠️ XML 注释里**不能出现连续两个减号**（连表格分隔行也不行）——
+              这里原本写了 markdown 表格，直接让 manifest 解析失败。
+            -->
+            <meta-data android:name="com.shware.mode.MOD_TOUCH"  android:value="self" />
+            <!-- ★ 任务 AQ：设置界面（字号缩放 / 容量自学习 / 卡片位置复位） -->
+            <meta-data android:name="com.shware.mode.MOD_SETTINGS" android:value=".SettingsActivity" />
+            <!-- ★ 图形化 UI 用的可选申报（任务 AP）—— 不写也有合理默认 -->
+            <meta-data android:name="com.shware.mode.MOD_CATEGORY" android:value="display" />
+            <meta-data android:name="com.shware.mode.MOD_ORDER"    android:value="20" />
+            <meta-data android:name="com.shware.mode.MOD_ICON"     android:value="feat_battery" />
+            <meta-data android:name="com.shware.mode.MOD_ENABLED_BY_DEFAULT" android:value="false" />
+        </service>
+
+        <!--
+          ★ 设置界面（任务 AQ）。
+
+          ⚠️ **必须带 `android:process=":mod_tntgobat"`** —— 它要与 Service 同进程，
+             否则读不到同一份 SharedPreferences（本 mod 刻意不依赖宿主的模块，
+             没有 IPC 通道；同进程是最省事也最可靠的做法）。
+          ★ 与 Service 一起被宿主拉起：`MOD_SETTINGS` 申报之后，
+             主界面卡片上会多一个「设置」按钮。
+        -->
+        <activity
+            android:name=".SettingsActivity"
+            android:process=":mod_tntgobat"
+            android:exported="true"
+            android:label="TNT GO 电量 · 设置"
+            android:launchMode="singleTop" />
+
+    </application>
+
+</manifest>

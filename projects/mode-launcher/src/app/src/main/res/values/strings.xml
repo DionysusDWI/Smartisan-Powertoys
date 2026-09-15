@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Smartisan Powertoys</string>
+    <string name="meta_key_service_label">Powertoys 按键观察</string>
+    <string name="meta_key_service_desc">观察外接键盘的 Meta(Win) 组合键，用于复刻 TNT 快捷键表。当前版本只观察、不拦截。</string>
+
+    <!-- ============ 主界面（HomeActivity） ============ -->
+    <string name="pt_home_title">Smartisan Powertoys</string>
+    <string name="pt_home_subtitle">TNT 桌面增强</string>
+    <string name="pt_action_layers">图层管理</string>
+    <string name="pt_action_refresh">刷新</string>
+    <string name="pt_action_dev">开发者选项</string>
+    <string name="pt_empty_title">还没有任何组件</string>
+    <string name="pt_empty_desc">装一个 mod APK，或在本应用内启用内置组件。</string>
+
+    <!-- ============ 图层管理（LayerActivity） ============ -->
+    <string name="pt_layer_title">图层管理</string>
+    <string name="pt_layer_subtitle">同一块屏上，谁画了什么</string>
+    <string name="pt_layer_empty">这块屏上目前没有任何悬浮图层。</string>
+    <string name="pt_layer_conflict_header">触摸冲突</string>
+
+    <!-- ============ 状态 ============ -->
+    <string name="pt_state_running">运行中</string>
+    <string name="pt_state_stopped">未运行</string>
+    <string name="pt_state_unknown">未知</string>
+    <string name="pt_state_error">异常</string>
+
+    <!-- ============ 其它 ============ -->
+    <string name="pt_btn_settings">设置</string>
+    <string name="pt_btn_start">启动</string>
+    <string name="pt_btn_stop">停止</string>
+    <string name="pt_btn_hide">隐藏</string>
+    <string name="pt_btn_show">显示</string>
+</resources>

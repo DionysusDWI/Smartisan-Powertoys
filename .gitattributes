@@ -1,0 +1,26 @@
+# 行尾统一为 LF（仓库以 Windows 开发、需在 Linux/macOS 上可读）
+* text=auto eol=lf
+
+# 二进制：**必须显式声明**，否则 git 可能把 CRLF 归一化写进二进制文件
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.apk  binary
+*.aar  binary
+*.jar  binary
+*.so   binary
+*.dll  binary
+*.exe  binary
+*.zip  binary
+*.gz   binary
+*.zst  binary
+*.xlsx binary
+
+# 生成物：不要在 diff / 语言统计里出现
+*.keystore linguist-generated
+*.apk      linguist-generated
+*.jar      linguist-generated
