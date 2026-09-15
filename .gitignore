@@ -64,8 +64,14 @@ xiaomi_migration_kit_*.sha256
 /PROGRESS-STATE.MD
 /CLAUDE.md
 /.paper/plans/
-#  ⚠️ `.paper/CHANGELOG.md`（逐轮留痕的流水账）由发布流程排除，
-#     **不是**靠这里的规则 —— 真要改请连它一起列进来。
+#  ⚠️ `.paper/CHANGELOG.md` 是**逐轮留痕的流水账**（267 KB），属过程而非结论，
+#     与上面三类同理。
+#  ★ 2026-09-15 更正：本文件此前写着「由发布流程排除，**不是**靠这里的规则」——
+#     而 GitHub 上的 `Smartisan-Powertoys` **就是**那个发布镜像，
+#     于是注释说的和实际入库的内容**对不上**（文件在库里，规则里却没有它）。
+#     ⇒ 现在改成**真的用规则排除**，注释与事实一致。
+#     要恢复入库：删掉下面这行 ＋ `git add -f .paper/CHANGELOG.md`。
+/.paper/CHANGELOG.md
 
 # ---------------------------------------------------------------- Python
 __pycache__/
