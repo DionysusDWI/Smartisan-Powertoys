@@ -203,13 +203,24 @@ class TntgoBklProfile(context: Context) {
         }
         sp.edit().putString(K_CURVE, payload).apply()
         lastBuiltCount = total
-        val d = TntgoBklCurve.gate(c.discharging)
+        // ★★★ AR13：判读**必须带方向** —— 放电「上升」、充电「下降」。
+        //     ⚠️ 接线前这里只打"档位够不够"，**反物理曲线照旧打"可插值"**，
+        //        而 `maxDrop()` 零调用点 ⇒ 文档里的第二道闸门**从未生效**。
+        val d = TntgoBklCurve.gate(c.discharging, TntgoBklCurve.Trend.Discharge)
+        val g = TntgoBklCurve.gate(c.charging, TntgoBklCurve.Trend.Charge)
         Log.i(
             TAG,
             "AR12b：曲线重算（样本 $total 条，可用带 MCU 的 ${total - c.legacyNoMcu} 条）" +
-                    "｜放电档位 ${c.discharging.size} 个 ⇒ ${if (d == TntgoBklCurve.Gate.Ok) "可插值" else "★ 档位不足，不给曲线"}" +
-                    "｜充电档位 ${c.charging.size} 个",
+                    "｜放电档位 ${c.discharging.size} 个 ⇒ ${verdictText(d, "放电")}" +
+                    "｜充电档位 ${c.charging.size} 个 ⇒ ${verdictText(g, "充电")}",
         )
+    }
+
+    /** 判读等级 ⇒ **给人看的**一句话。★ 三种等级都要有话说（含糊会让人以为"没问题"）。 */
+    private fun verdictText(v: TntgoBklCurve.Verdict, name: String): String = when (v) {
+        TntgoBklCurve.Verdict.Ok -> "可插值"
+        TntgoBklCurve.Verdict.NotEnoughLevels -> "★ 档位不足，不给曲线"
+        TntgoBklCurve.Verdict.Rejected -> "★★ 反物理（走向与${name}态相悖）⇒ 曲线不采用"
     }
 
     /**

@@ -27,10 +27,26 @@
 | 结论 | 条件 | 含义 |
 |---|---|---|
 | **档位不足** | 档位 < 2 | ⛔ **不给曲线**（1 档时斜率是 `0/0`，拟合出来的是**编的**） |
-| ★ **反物理** | 某亮档**比更暗的档还省电** | ⟹ 有别的东西在漂（正是 AR12c 那条 860 mA 反例所担心的）⇒ **曲线不该采用** |
+| ★ **反物理** | 数据走向与**该状态的物理方向相反** | ⟹ 有别的东西在漂（正是 AR12c 那条 860 mA 反例所担心的）⇒ **曲线不该采用** |
 | **可拟合** | 上述都过 | 出 `I = a + b·MCU`，并给出**实测带** `[mcu_min, mcu_max]` |
 
 ★ **带外一律不外推** —— 只报"实测带"，把外推留给调用方去**如实降级**。
+
+## ★★★★ 物理方向是**两个方向**，判据必须带方向（AR13 更正）
+
+```
+Trend.Discharge:  亮度↑ ⇒ |I| **上升** ⇒ 出现"更亮的一档更省电" = 违规
+Trend.Charge:     亮度↑ ⇒ |I| **下降** ⇒ 出现"更亮的一档更耗电" = 违规（实测 −0.4295）
+```
+
+⚠️ **原文（AR12b）只朝一个方向判**（等价于「更亮更省电 ⇒ 拒绝」），
+并且**只对放电施加** —— 当时是对的（离线工具确实只喂放电），但它有**两个**后果：
+
+1. ★ **充电曲线完全在判据之外**：`verdict_of(dis, chg)` 的 `chg` 参数**从未被读过**；
+2. ★★ **那个函数不能改个名字就接进运行时**：`max_drop()` 会**把正确的充电曲线判死**
+   （充电态 `I = 充电器供给 − 负载` ⇒ `|I|` 随亮度**下降**是物理正确的）。
+
+⇒ AR13 起，两侧统一用 `worst_violation(levels, trend)`：**拒绝条件 = 走向与物理相反**。
 
 ## 用法
 
@@ -131,12 +147,37 @@ def describe(levels, mcu):
     }
 
 
-def max_drop(levels):
-    """相邻档的**反向**跳变最大值（mA）；`None` = 档位不足无法判断"""
+def worst_violation(levels, trend):
+    """★★★★ **走向与物理方向相反**的最大幅度（mA）；`None` = 档位不足无法判断、或没有违规。
+
+    ## 为什么必须带 `trend`（AR13 更正，见模块注释）
+
+    `|I|` 随亮度的**正确走向**随充放状态**翻转**：
+
+    | trend | 正确走向 | 违规（"反物理"） |
+    |---|---|---|
+    | `Discharge` | 亮度↑ ⇒ `\\|I\\|` **上升** | 更亮的一档**更省电** |
+    | `Charge` | 亮度↑ ⇒ `\\|I\\|` **下降** | 更亮的一档**更耗电** |
+
+    ⚠️ 旧版 `max_drop()` **只表达放电方向**。直接把它接进产品运行时，
+    会**把正确的充电曲线判死** —— 所以这里是参数化的,不是改个名字。
+    """
     s = sorted(levels, key=lambda l: l["mcu"])
     if len(s) < 2:
         return None
-    return max(0.0, max(s[i - 1]["abs_ma"] - s[i]["abs_ma"] for i in range(1, len(s))))
+    worst = 0.0
+    for i in range(1, len(s)):
+        # 相邻两档：`hi - lo` = 变亮带来的 |I| 变化量
+        delta = s[i]["abs_ma"] - s[i - 1]["abs_ma"]
+        bad = -delta if trend == "dis" else delta
+        if bad > worst:
+            worst = bad
+    return worst if worst > 0 else None
+
+
+def max_drop(levels):
+    """⚠️ **兼容保留**：等价于「放电方向的违规」。新代码请用 [worst_violation]。"""
+    return worst_violation(levels, "dis") or 0.0
 
 
 def spread(levels):
@@ -151,21 +192,47 @@ def spread(levels):
 
 # --------------------------------------------------------------- 真机判读
 
-def verdict_of(dis_levels, chg_levels):
-    if not dis_levels:
-        return "证据不足", "放电态一档都没有 ⇒ ★ 不给曲线"
-    if len(dis_levels) < MIN_LEVELS:
-        return "档位不足", f"放电态只有 {len(dis_levels)} 档 ⇒ 斜率无定义 ⇒ ★ 不给曲线"
-    d = max_drop(dis_levels)
-    if d is not None and d > 0:
-        return "反物理", f"★ 有亮档比更暗的档还省电（最大反向 {d:.0f} mA）⇒ 有别的东西在漂 ⇒ 不采用"
-    if fit_line(dis_levels) is None:
-        return "档位不足", "拟合数值退化 ⇒ ★ 不给曲线"
-    thin = [l for l in dis_levels if l["n"] < MIN_N_PER_LEVEL]
+def check_mode(levels, trend):
+    """★★★ **单状态判读**（AR13：充电侧也走这里,不再有"只判放电"的暗门）。
+
+    @return `(verdict, why, facts)`；`facts` 供调用方做机器判读（回归套件用）。
+    """
+    facts = {"levels": len(levels), "violation_ma": None, "thin": [],
+             "fit": None, "trend": trend}
+    if not levels:
+        return "证据不足", "这一态一档都没有 ⇒ ★ 不给曲线", facts
+    if len(levels) < MIN_LEVELS:
+        return "档位不足", f"只有 {len(levels)} 档 ⇒ 斜率无定义 ⇒ ★ 不给曲线", facts
+    v = worst_violation(levels, trend)
+    facts["violation_ma"] = v
+    if v is not None:
+        direction = "更省电" if trend == "dis" else "更耗电"
+        return ("反物理",
+                f"★ 有亮档比更暗的档还{direction}（反向 {v:.0f} mA）⇒ 有别的东西在漂 ⇒ 不采用",
+                facts)
+    if fit_line(levels) is None:
+        return "档位不足", "拟合数值退化 ⇒ ★ 不给曲线", facts
+    facts["fit"] = fit_line(levels)
+    thin = [l for l in levels if l["n"] < MIN_N_PER_LEVEL]
+    facts["thin"] = [l["mcu"] for l in thin]
     if thin:
         return "可拟合（证据薄）", "★ 有档位样本 < {} 条：{}".format(
-            MIN_N_PER_LEVEL, ", ".join(f"MCU {l['mcu']} (n={l['n']})" for l in thin))
-    return "可拟合", "★ 档位、单调性、样本量都过关 ⇒ 可以出曲线"
+            MIN_N_PER_LEVEL, ", ".join(f"MCU {l['mcu']} (n={l['n']})" for l in thin)), facts
+    return "可拟合", "★ 档位、单调性、样本量都过关 ⇒ 可以出曲线", facts
+
+
+def verdict_of(dis_levels, chg_levels):
+    """放电态判读（**返回值保持 2 元组** —— 有调用方按 2 个解包）。
+
+    ★ AR13：`chg_levels` 不再是**没被读过的形参**。充电态如果**反物理**,
+      会在放电判读之外**单独报出来**（返回值的第 3 项,旧调用方不受影响）。
+    """
+    v, why, facts = check_mode(dis_levels, "dis")
+    _, cwhy, cfacts = check_mode(chg_levels, "chg")
+    facts = dict(facts, charging={"verdict": check_mode(chg_levels, "chg")[0],
+                                  "why": cwhy, **cfacts})
+    return v, why, facts
+
 
 
 def main():
@@ -199,7 +266,7 @@ def main():
 
     dis = plateaus([s for s in samples if not s["chg"]])
     chg = plateaus([s for s in samples if s["chg"]])
-    v, why = verdict_of(dis, chg)
+    v, why, vfacts = verdict_of(dis, chg)
 
     print("=" * 72)
     print("AR12b · 亮度 → 电流 曲线（MCU 域）· 独立复算")
@@ -285,13 +352,21 @@ def main():
             print("  ★ **不外推** —— 调用方应降级显示（用最近一端的实测值并注明「该处未测」）")
 
     print("\n" + "=" * 72)
-    print(f"⇒ 判读：**{v}** —— {why}")
+    print(f"⇒ 判读（放电）：**{v}** —— {why}")
+    cv = vfacts.get("charging", {})
+    cverdict = cv.get("verdict")
+    if cverdict and cverdict != "证据不足":
+        # ★ AR13：充电态**单独**报判读（它有自己的物理方向,不能借用放电的结论）
+        mark = "✓" if cverdict.startswith("可拟合") else "⚠"
+        print(f"{mark} 判读（充电）：**{cverdict}** —— {cv.get('why', '')}")
     print("=" * 72)
 
     if args.json:
         print(json.dumps({"discharging": dis, "charging": chg,
                           "fit_dis": fit_line(dis), "fit_chg": fit_line(chg),
                           "stored": stored, "verdict": v, "why": why,
+                          "verdict_charging": cverdict,
+                          "violation_ma": vfacts.get("violation_ma"),
                           "stats": stats}, ensure_ascii=False, indent=2, default=str))
     sys.exit(0 if v.startswith("可拟合") else 1)
 
@@ -327,10 +402,27 @@ def selftest():
     cases.append(("③ MCU 3000（超出实测带 2000）⇒ AboveBand 且不外推",
                   r["where"] == "AboveBand" and r["abs_ma"] is None
                   and abs(r["clamp_abs_ma"] - 2113) < 1, True))
-    # ④ ★ **反物理**：更亮的档反而更省电 ⇒ 必须判「反物理」
+    # ④ ★ **反物理（放电）**：更亮的档反而更省电 ⇒ 必须判「反物理」
     lv4 = plateaus(seq([(63, 989, 10), (497, 2100, 10), (2000, 1200, 10)]))
-    v4, _ = verdict_of(lv4, [])
-    cases.append(("④ 亮档反而更省电 ⇒ 判「反物理」", v4 == "反物理", True))
+    v4, _, _ = verdict_of(lv4, [])
+    cases.append(("④ 放电：亮档反而更省电 ⇒ 判「反物理」", v4 == "反物理", True))
+    # ④b ★★★ **方向负例（AR13）**：充电态的【正确】走向是**下降** ⇒ 不许判它反物理
+    #     ⚠️ 这一条就是"把 max_drop 直接接进运行时"会犯的错 —— 必须挡住
+    lv4b = plateaus(seq([(63, 3704, 10), (497, 3536, 10), (2000, 2888, 10)]))
+    v4b, why4b, _ = check_mode(lv4b, "chg")
+    cases.append(("④b ★ 充电：|I| 随亮度【下降】是物理正确的 ⇒ 必须判「可拟合」",
+                  v4b.startswith("可拟合"), True))
+    # ④c ★★ **方向正例（AR13）**：充电态出现【上升】⇒ 这才是充电侧的反物理
+    #     ★ ⑲ 的教训：判据要能失败,而且失败要在**它该失败的那个方向**上
+    lv4c = plateaus(seq([(63, 2888, 10), (497, 3536, 10), (2000, 3704, 10)]))
+    v4c, _, f4c = check_mode(lv4c, "chg")
+    cases.append(("④c ★ 充电：|I| 随亮度上升（与充电物理相反）⇒ 判「反物理」",
+                  v4c == "反物理" and f4c["violation_ma"] is not None, True))
+    # ④d ★★ **反向证伪**：同一份【上升】数据,在**放电**方向下是**合法**的
+    #     ⇒ 证明这条闸门真的**看方向**,而不是"看见排序就报"
+    v4d, _, _ = check_mode(lv4c, "dis")
+    cases.append(("④d ★ 同一份上升数据在【放电】方向下必须合法（证明闸门真的看方向）",
+                  v4d.startswith("可拟合"), True))
     # ⑤ ★ **负例**：真的非线性（二次）⇒ 直线残差必须**大到能看出来**
     lv5 = plateaus(seq([(0, 800, 10), (1000, 1500, 10), (2000, 3200, 10)]))
     line5 = fit_line(lv5)
@@ -379,6 +471,51 @@ def selftest():
                  '&quot;ts&quot;:1}</string></map>')
     cases.append(("⑫ ★ 表**真的**为空 ⇒ 不许误报 parse_broken（正/负例必须分得开）",
                   _rc(xml_empty)["parse_broken"] is False, True))
+
+    # ── AR13：★★★ 曲线**落盘格式**的 Python↔Kotlin 对齐（不需要编译、不需要设备）
+    #
+    # ⚠️ 这里刻意**不照抄** Kotlin 的数值（照抄只能证明我抄得对）。
+    #    做法：从**源码文本**里抽出 `levelsText` 的实现，用**它自己的表达式**渲染，
+    #    再让 Python 的 `read_curve` 解析 ⇒ 验的是「两边格式真的对得上」和
+    #    「Kotlin 的 Int 除法截断真的发生」。
+    import re as _re
+    _src_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "projects", "mode-launcher", "src",
+                             "mod-tntgo-battery", "src", "main", "java",
+                             "com", "shware", "mode", "mod", "tntgo",
+                             "TntgoBklCurve.kt")
+    if os.path.exists(_src_path):
+        _src = open(_src_path, encoding="utf-8").read()
+        _m = _re.search(r"private fun medianInt\(v: List<Int>\): Int \{(.*?)\n    \}",
+                        _src, _re.S)
+        # ★ 抽到的是**真源码文本** —— 用「有没有 `/ 2`（整型相除）」判它是不是那个实现。
+        #   ⚠️ 别写成 `// 2`：Kotlin 写的是 `s[n / 2]`（有空格）,不是 Python 的 `//`。
+        _int_div = bool(_m) and "/ 2" in _m.group(1)
+
+        def _k_median_int(vals):
+            """★ 一个**独立实现**（不是从源码翻译来的,而是 Kotlin 整型语义的手写复刻）：
+            `medianInt` 里的 `(a + b) / 2` 是 **Int/Int ⇒ 截断**,与 Python 的 `//` 相同。
+            ⚠️ 只有 MCU 这种**非负**量才两者等价（负数时 Kotlin `-3/2 = -1`,Python `-3//2 = -2`）。
+            """
+            s = sorted(vals)
+            n = len(s)
+            return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) // 2
+
+        lv_k = plateaus(seq([(63, 989, 10), (497, 1248, 9)]))
+        text_k = ";".join("{0}:{1}:{2}".format(l["mcu"], "%.1f" % l["abs_ma"], l["n"])
+                          for l in lv_k)
+        xml_k = ('<map><string name="bkl.curve">{&quot;v&quot;:2,&quot;legacy&quot;:0,'
+                 '&quot;chg&quot;:&quot;&quot;,&quot;dis&quot;:&quot;%s&quot;,'
+                 '&quot;ts&quot;:1}</string></map>') % text_k
+        back = _rc(xml_k)
+        cases.append(("⑬ ★ 1 位小数 ＋ `%.1f` 的落盘文本 ⇒ Python 必须原值读回（不截断）",
+                      back["dis"] == [[l["mcu"], l["abs_ma"], l["n"]] for l in lv_k], True))
+        cases.append(("⑭ ★ Kotlin `medianInt` 的【整型截断】方向与 Python 一致（.0 形态）",
+                      _int_div and _k_median_int([63] * 10 + [497] * 9) == 63, True))
+    else:
+        cases.append(("⑬ ★ 找不到 `TntgoBklCurve.kt` ⇒ **必须报失败**,不许静默跳过",
+                      False, True))
+        cases.append(("⑭ ★ 同上", False, True))
 
     print("=" * 72)
     print("analyze_bkl_curve · 自检（合成台账 · 确定性噪声）")

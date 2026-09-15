@@ -43,7 +43,7 @@ import kotlin.math.abs
  *
  * ⇒ ★ 混在一起拟合 ⇒ 曲线被充电状态**整个淹没**，而且**看不出来**。
  *
- * ## ★★★★ 两条"不猜"的红线（与 AR §阶段 C+ 同源）
+ * ## ★★★★ 三条"不猜"的红线（与 AR §阶段 C+ 同源）
  *
  * 1. **实测带外 ⇒ 不外推。** 若某档电流只测到 `MCU ≤ 1000`，用户却在 `MCU 2000`，
  *    把这条直线延长过去是 `≈ 2.9 W` —— **可能差一倍多，却看着很精确**。
@@ -51,6 +51,11 @@ import kotlin.math.abs
  *      ★ 与"亮度未知 ⇒ 显示亮度未知"是同一条纪律。
  * 2. **档位太少 ⇒ 不给曲线。** 只有一档时斜率是 `0/0`，
  *    硬拟合出来的是一条**恰好过该点的水平线** —— 那是编的，不是学的。
+ * 3. ★★ **走向反物理 ⇒ 不给曲线**（**AR13 才真正接上**）。若更亮的一档反而更省电，
+ *    说明台账里有**别的东西在漂**（正是 AR12c 那条 860 mA 反例所担心的）；
+ *    此时那条直线是被异常点**拽着**的，插值出来的四位数毫安是**假的**。
+ *    ⇒ [gate] 返回 [Verdict.Rejected]，[estimate] 降级成"该处未测"。
+ *    ⚠️ 方向随充/放**翻转** —— 判据必须带 [Trend]，见 [Trend] 的注释。
  */
 object TntgoBklCurve {
 
@@ -86,14 +91,36 @@ object TntgoBklCurve {
         fun at(mcu: Double): Double = a + b * mcu
     }
 
-    /** 拟合的**结论等级** —— 两种情况必须分开，不许含糊 */
-    enum class Gate {
-        /** 档位 ≥ [MIN_LEVELS] 且数值有效 ⇒ 可以插值 */
+    /**
+     * ★★★★ **拟合的结论等级** —— 三种情况必须分开，不许含糊。
+     *
+     * ⚠️ **AR13 更正**：原版只有 `Ok / NotEnoughLevels` 两种 ⇒ **"反物理"无处可放**，
+     * 于是 `maxDrop()`（当时已写好）**零调用点**、文档却写着"两道闸门"。
+     * ⇒ 判据接不上线，往往**不是忘了写，而是结论等级里没有它的位置**。
+     */
+    enum class Verdict {
+        /** 档位 ≥ [MIN_LEVELS]、数值有效、且走向与物理一致 ⇒ 可以插值 */
         Ok,
 
         /** 档位太少 ⇒ ★ **不给曲线**（不是"给一条差的"） */
         NotEnoughLevels,
+
+        /** ★★ 数据走向与**该状态的物理方向相反** ⇒ 有别的东西在漂 ⇒ **曲线不采用** */
+        Rejected,
     }
+
+    /**
+     * ★★★★ **`|I|` 随亮度的正确走向** —— 充/放电**方向相反**，判据必须带它。
+     *
+     * | trend | `I` 的含义 | 亮度↑ 时 `\|I\|` 应当 |
+     * |---|---|---|
+     * | [Discharge] | `I = −(负载 − 外部供给)` | ★ **上升** |
+     * | [Charge] | `I = 充电器供给 − 负载` | ★ **下降**（实测 `−0.4295 / 1000 MCU`） |
+     *
+     * ⚠️⚠️ 这正是"把 [maxDrop] 直接接进 [gate] **会引入 bug**"的原因：
+     * `maxDrop` 只表达**放电**方向的违规 ⇒ 会把**正确的充电曲线判死**。
+     */
+    enum class Trend { Discharge, Charge }
 
     /** 当前亮度落在实测带的哪里 */
     enum class Where {
@@ -210,25 +237,59 @@ object TntgoBklCurve {
         return Line(a = my - b * mx, b = b)
     }
 
-    /** 拟合的**结论等级**（★ 不足就不给，而不是给一条差的） */
-    fun gate(levels: List<Level>): Gate =
-        if (levels.size >= MIN_LEVELS && fitLine(levels) != null) Gate.Ok else Gate.NotEnoughLevels
+    /**
+     * ★★★★★ **拟合的结论等级 —— 这是产品【真正】走的那道闸**（AR13 接线）。
+     *
+     * ## 原来错在哪（2026-09-15 查出，AR13 修）
+     *
+     * 本函数原先**只判** `levels.size >= MIN_LEVELS && fitLine(levels) != null`，
+     * 而 [maxDrop]（注释自称"反物理⇒曲线不该被采用"）**全仓库零调用点**，
+     * 且本函数就在它正上方 47 行。文档写"两道闸门"，产品运行时**只有一道**。
+     *
+     * ⚠️ 症状的形态：**让一切看起来正常** —— `gate()` 照旧返回 `Ok`、
+     *    日志照旧打「可插值」、卡片照旧显示曲线值，**没有任何一处报错**。
+     *
+     * ## 为什么必须收 [trend] 参数（而不是"把 [maxDrop] 接进来"）
+     *
+     * [maxDrop] 的拒绝方向**只假设放电态**（更亮 ⇒ 更耗电）。而充电态
+     * `I = 充电器供给 − 负载` ⇒ **`|I|` 随亮度下降是物理正确的**（实测 `−0.4295`）。
+     * ⇒ 直接把 `maxDrop` 接进来会**把正确的充电曲线判死**。
+     *
+     * @param levels 档位表（充/放**各传各自的表**，绝不混）
+     * @param trend  ★ 该表的物理方向（见 [Trend]）
+     */
+    fun gate(levels: List<Level>, trend: Trend): Verdict {
+        if (levels.size < MIN_LEVELS) return Verdict.NotEnoughLevels
+        if (worstViolation(levels, trend) != null) return Verdict.Rejected
+        if (fitLine(levels) == null) return Verdict.NotEnoughLevels
+        return Verdict.Ok
+    }
+
+    /** 兼容重载：旧调用点（只有一条产品路径）按**放电**语义。新代码请显式传 [Trend]。 */
+    fun gate(levels: List<Level>): Verdict = gate(levels, Trend.Discharge)
 
     /**
-     * ★★★★ **问"当前亮度下电流是多少"** —— 带外**绝不外推**。
+     * ★★★★ **"当前亮度下电流是多少"** —— 带外**绝不外推**，反物理**绝不采用**。
+     *
+     * ⚠️ **AR13 更正**：原版**只查了带外**，把 [gate] 提到的"反物理"**漏了** ——
+     * 于是 `maxDrop()` 那 900 mA 的反向跳变**进了插值**：
+     * 直线被"更亮的一档反而更省电"往下拽 ⇒ 卡片会给出一个四位数毫安的假读数。
+     * ⇒ 现在先过 [gate]：`Rejected` 时一律降级成"该处未测"（与带外同一条纪律）。
      *
      * @param mcu 当前亮度的 **MCU 域**值（不是 UI）
+     * @param trend ★ 该表的物理方向
      */
-    fun estimate(levels: List<Level>, mcu: Int): Estimate {
+    fun estimate(levels: List<Level>, mcu: Int, trend: Trend): Estimate {
         if (levels.isEmpty()) {
             return Estimate(null, Where.NoLevels, null, null, null, 0)
         }
         val sorted = levels.sortedBy { it.mcu }
         val lo = sorted.first()
         val hi = sorted.last()
-        val line = fitLine(levels)
+        // ★★ 闸门（AR13）：反物理 ⇒ 不给数、不插值 ⇒ 调用方如实显示"该处未测"
+        val line = if (gate(levels, trend) == Verdict.Ok) fitLine(levels) else null
         if (line == null) {
-            // 只有一档（或数值退化）⇒ ★ 给不出斜率，只能说"该处未测"
+            // 档位不足／数值退化／★★ 反物理 ⇒ ★ 一律给不出数，只能说"该处未测"
             val only = sorted.first()
             return Estimate(
                 absMa = null,
@@ -252,23 +313,42 @@ object TntgoBklCurve {
         )
     }
 
-    /** ★★ **单调性自检**：相邻档位中位数差的最大**反向**跳变（mA）。
+    /** 兼容重载：旧调用点按**放电**语义。新代码请显式传 [Trend]。 */
+    fun estimate(levels: List<Level>, mcu: Int): Estimate = estimate(levels, mcu, Trend.Discharge)
+
+    /**
+     * ★★★★★ **"走向与物理相反"的最大幅度（mA）** —— `null` = 档位不足 / **没有违规**。
      *
-     * 物理上 `|I|` 随 MCU 单调递增。若出现反向跳变，说明台账里有别的东西在漂
-     * （正是 AR12c 那条 860 mA 反例所担心的）⇒ 曲线**不该被采用**。
+     * | trend | 正确走向 | 违规（"反物理"） |
+     * |---|---|---|
+     * | [Trend.Discharge] | 亮度↑ ⇒ `\|I\|` **上升** | 更亮的一档**更省电** |
+     * | [Trend.Charge] | 亮度↑ ⇒ `\|I\|` **下降** | 更亮的一档**更耗电** |
      *
-     * @return `null` = 档位不足，无法判断
+     * ⚠️ **原来叫 `maxDrop`，只表达放电方向**（`更亮却更省电` 才算违规）。
+     * 那个方向**在充电态是错的** —— 见 [Trend] 与 [gate] 的注释。
+     * 名字改掉是有意的：**一个不看方向的函数，接上闸门就会误杀**。
+     *
+     * @return `null` = 档位不足无法判断 **或** 走向正确；否则为违规幅度（> 0）
      */
-    fun maxDrop(levels: List<Level>): Double? {
+    fun worstViolation(levels: List<Level>, trend: Trend): Double? {
         val s = levels.sortedBy { it.mcu }
         if (s.size < 2) return null
         var worst = 0.0
         for (i in 1 until s.size) {
-            val d = s[i - 1].absMa - s[i].absMa     // 更亮的一档却更省电 ⇒ 正数（反物理）
-            if (d > worst) worst = d
+            // 相邻两档：`Δ` = 变亮带来的 |I| 变化量
+            val delta = s[i].absMa - s[i - 1].absMa
+            val bad = if (trend == Trend.Discharge) -delta else delta
+            if (bad > worst) worst = bad
         }
-        return worst
+        return if (worst > 0.0) worst else null
     }
+
+    /**
+     * ⚠️ **兼容保留**：等价于「放电方向的违规幅度」，`null` ⇒ `0.0`。
+     * 新代码请用 [worstViolation]（它带方向）。
+     */
+    fun maxDrop(levels: List<Level>): Double? = worstViolation(levels, Trend.Discharge) ?: 0.0
+
 
     // ------------------------------------------------------------------ 小工具
 
