@@ -42,7 +42,7 @@
 | | |
 |---|---|
 | **系统** | Smartisan OS / Android 10（SDK 29）及以上 |
-| **已验证机型** | 坚果 Pro 3（DT1901A）＋ **TNT GO** 便携屏 |
+| **已验证机型** | **只适用于 Smartisan Nut Pro 3**（DT1901A）＋ **TNT GO** 便携屏 |
 | **架构** | arm64 |
 | **root** | ❌ **不需要** |
 | **构建** | JDK 17 ＋ Android SDK（`minSdk 29` / `targetSdk 35`） |
@@ -56,11 +56,15 @@
 
 ### 方式一：直接装预编译 APK（推荐）
 
-从 [**Releases**](../../releases) 下载 `powertoys-debug.apk`：
+从 [**Releases**](../../releases) 下载 `powertoys-v0.3.0-20260915.apk`
+（最新版 ⇒ [v0.3.0 发布说明](docs/20260915_开发预览版发布说明_v0.3.0.md)）：
 
 ```bash
-adb install -r powertoys-debug.apk
+adb install -r powertoys-v0.3.0-20260915.apk
 ```
+
+> ⛔ **只适用于 Smartisan Nut Pro 3（DT1901A）。** 其它机型**明确不适用** ——
+> 原因见[发布说明](docs/20260915_开发预览版发布说明_v0.3.0.md)文首。
 
 ### ⚠️ 装完还有**一步 adb 干不了**的活
 
