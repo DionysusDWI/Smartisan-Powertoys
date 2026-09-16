@@ -48,8 +48,11 @@ android {
         applicationId = "com.shware.mode"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-powertoys"
+        // ★ 2026-09-16 v0.3.1：v0.3.0 发布之后才提交的 AR13，加上 G1/G3/C1 三项，
+        //   内容已与 v0.3.0 完全不同 ⇒ **必须升 versionCode**，
+        //   否则同版本号不同内容的 APK 会让 `install -r` 静默失败。
+        versionCode = 4
+        versionName = "0.3.1-powertoys"
     }
 
     buildTypes {
