@@ -1262,9 +1262,8 @@ def item_wiring(rep):
         #       而且**一行异常日志都没有**，卡片照常渲染一个几十分钟前的快照）。
         #    ★ 这是纪律 ⑨「文件里有一次写入 ≠ 发布者在心跳」的**同族**：
         #       失效方式同样是"让一切看起来正常"。
-        checks.append(("④-⑨-B refreshCurve 的节流键**同时用条数与末条样本**"
-                       "（只比条数 ⇒ 环形台账装满后曲线永不重算、闸门静默失效）",
-                       "lastBuiltKey" in s and "raw.lastOrNull()" in s))
+        checks.append(("④-⑨-B 节流用一个**显式的新鲜度键字段**（`lastBuiltKey`）",
+                       "lastBuiltKey" in s))
         checks.append(("④-⑨-B 判定用的是那个键本身（`key == lastBuiltKey`），"
                        "不是拿条数单独判",
                        "key == lastBuiltKey" in s_flat))
@@ -1273,6 +1272,29 @@ def item_wiring(rep):
         old_throttle = "total == lastBuiltCount" in s
         checks.append(("④-⑨-B 旧的「只看条数」节流**已不在**"
                        "（若它回来了，说明修法被回退）", not old_throttle))
+        # ── ★★★★★ ㊲（2026-09-16）：**"条数 ＋ 末条样本"也还不够**
+        #    ⛔ 守的形态：环形**每拍挤掉一条老样本**，而"新追加的那条与上一拍逐字相同"时
+        #       **键不变** ⇒ 内容变了、键没变 ⇒ 曲线不重算、闸门静默地不执行。
+        #       ★ **真机已触发**（240 条里 1 处相邻逐字相同，而缓冲是混合的、4 个档位）。
+        checks.append(("④-㊲ refreshCurve 的新鲜度键 = **台账全部内容**"
+                       "（全串；只取末条 ⇒ 环形挤掉老样本时判不出来）",
+                       "raw.joinToString(\",\")" in s_flat))
+        checks.append(("④-㊲ 旧的「条数 ＋ 末条样本」形态**已不在**"
+                       "（若它回来了，说明修法被回退）",
+                       "raw.lastOrNull()" not in s))
+        #    ★★ 上面两条是**结构核验**。结构核验有个已知弱点：它只证明"代码长这样"，
+        #       不证明"这个键真的有分辨力"。⇒ 再补一条**可执行的模型**。
+        #       ⚠️ 这是**判据应当具备的性质**的可执行表述 —— 受测实现是否具备它，
+        #          仍由上面两条保证。（两种判据都不完美，所以两种都做。）
+        ring_prev = ["A", "A", "B", "X"]
+        ring_now = ["A", "B", "X", "X"]        # 环形轮转：挤掉一条 A、追加一条 X
+        _old_key = lambda r: "{}#{}".format(len(r), r[-1] if r else "")
+        _new_key = lambda r: ",".join(r)
+        checks.append(("④-㊲ **模型**：环形轮转 ＋ 末条样本相同 ⇒ 旧键「条数 ＋ 末条样本」"
+                       "**漏判**（这就是真机上触发过的形态）",
+                       _old_key(ring_prev) == _old_key(ring_now) and ring_prev != ring_now))
+        checks.append(("④-㊲ **模型**：同一个轮转，新键「全部内容」**必须**判出变化",
+                       _new_key(ring_prev) != _new_key(ring_now)))
     else:
         checks.append(("④ 找得到 TntgoBklProfile.kt", False))
     if os.path.exists(SERVICE_KT):
