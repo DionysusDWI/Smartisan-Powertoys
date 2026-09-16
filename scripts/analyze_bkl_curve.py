@@ -52,7 +52,7 @@ Trend.Charge:     亮度↑ ⇒ |I| **下降** ⇒ 出现"更亮的一档更耗�
 
 ```bash
 python scripts/analyze_bkl_curve.py                 # 读真机台账并复算
-python scripts/analyze_bkl_curve.py --selftest      # 用合成台账证伪本工具（5 条判据）
+python scripts/analyze_bkl_curve.py --selftest      # 用合成台账证伪本工具（逐条报，含 G2 方向区分性）
 python scripts/analyze_bkl_curve.py --dump-xml a.xml --json
 ```
 """
@@ -68,13 +68,30 @@ from bkl_common import read_ledger, read_curve, median, mad   # noqa: E402
 TOLERANCE_MCU = 40      # ★ 必须与 TntgoBklCurve.TOLERANCE_MCU 一致
 MAX_BUCKET_MCU = 300    # ★ 必须与 TntgoBklCurve.MAX_BUCKET_MCU 一致
 MIN_LEVELS = 2          # ★ 必须与 TntgoBklCurve.MIN_LEVELS 一致
-MIN_N_PER_LEVEL = 3     # 判读用：一条档位少于这么多样本 ⇒ 当作"证据薄"（**不剔除，只标注**）
+MIN_N_PER_LEVEL = 3     # ★★ G1：一档**至少**这么多样本才算"一档"（**不足 ⇒ 剔除，不只是标注**）
+# ⚠️ 2026-09-16 之前这里是"证据薄（**不剔除，只标注**）"⇒ 判读仍拿薄档去判
+#    ⇒ 与产品侧行为**不一致**。现在两侧都**剔除**，且门槛**钉在判读入口**（见 wire_levels）。
+# ★ 必须与 `TntgoBklCurve.MIN_N_PER_LEVEL` 一致。
 
 
 # --------------------------------------------------------------- 口径实现（镜像）
 
-def plateaus(samples, tolerance=TOLERANCE_MCU, bucket_max=MAX_BUCKET_MCU):
-    """① 分档 ② 档内取中位数 ⇒ `[{'mcu':int,'abs_ma':float,'n':int}, ...]`（按 MCU 升序）"""
+def plateaus(samples, tolerance=TOLERANCE_MCU, bucket_max=MAX_BUCKET_MCU,
+             min_n=MIN_N_PER_LEVEL):
+    """① 分档 ② 档内取中位数 ⇒ `[{'mcu':int,'abs_ma':float,'n':int}, ...]`（按 MCU 升序）
+
+    ★★ G1（2026-09-16）：**`n < min_n` 的簇不是一档，直接不产出**。
+
+    ⚠️ 与 `TntgoBklCurve.plateauing(minN=…)` 是**同一个口径**（那边是产品、这边是镜像）。
+
+    为什么必须剔、而不是"留下再标注"：闸门判违规靠**相邻两档中位数之差**。
+    真机实测 `mcu=178` 只有 2 条（`1116` 与 `2108`，充/放切换瞬态）⇒ 中位数 `1612`
+    落在两个真值**中间** —— **那个档位根本不存在**，却比 `497` 档的 `1344` 还高
+    ⇒ 判出 `178→497 反向 268 mA` ⇒ **整条放电曲线被拒**。剔掉它之后
+    放电 `980 → 1344 → 2068` **完全单调**。
+
+    ★ 需要**含薄档的原始表**时显式传 `min_n=1`（门槛矩阵/诊断用）。
+    """
     pts = sorted((s["mcu"], abs(s["ma"])) for s in samples
                  if s.get("mcu") is not None and abs(s["ma"]) > 0)
     if not pts:
@@ -88,15 +105,39 @@ def plateaus(samples, tolerance=TOLERANCE_MCU, bucket_max=MAX_BUCKET_MCU):
                 or pts[i][0] - lo > bucket_max)
         if over:
             seg = pts[start:i]
-            out.append({
-                "mcu": int(median([p[0] for p in seg])),
-                "abs_ma": median([p[1] for p in seg]),
-                "n": len(seg),
-            })
+            # ★★ G1：证据太薄的簇**不是一档** ⇒ 不进表（下游闸门/拟合/插值带全都只认这张表）
+            if min_n <= 1 or len(seg) >= min_n:
+                out.append({
+                    "mcu": int(median([p[0] for p in seg])),
+                    "abs_ma": median([p[1] for p in seg]),
+                    "n": len(seg),
+                })
             if i < len(pts):
                 start = i
                 lo = pts[i][0]
     return out
+
+
+def wire_levels(levels, min_n=MIN_N_PER_LEVEL):
+    """★★ G1 的过滤本身 —— 与 `plateaus(min_n=…)` **同一口径**。
+
+    ⚠️ 为什么判读侧还要再滤一次：`levels` 可能是**从盘上回读**的
+    （回读路径不经过 `plateaus`）⇒ 门槛必须钉在判读入口上，
+    否则"回读的曲线"会绕过 G1。**判据要长在唯一入口上，不是长在某个调用点上。**
+    """
+    if min_n <= 1:
+        return list(levels)
+    return [l for l in levels if l["n"] >= min_n]
+
+
+def _same_levels(a, b):
+    """档位表逐项相等（`b` 是盘上那份 `[(mcu, abs_ma, n), …]` 形态）。"""
+    if len(a) != len(b):
+        return False
+    for x, y in zip(a, b):
+        if abs(x["mcu"] - y[0]) != 0 or abs(x["abs_ma"] - y[1]) >= 0.05 or x["n"] != y[2]:
+            return False
+    return True
 
 
 def fit_line(levels):
@@ -118,32 +159,60 @@ def fit_line(levels):
     return {"a": my - b * mx, "b": b}
 
 
-def describe(levels, mcu):
+def describe(levels, mcu, min_n=MIN_N_PER_LEVEL, trend="dis"):
     """★★★★ 问"当前 MCU 下电流是多少" —— ★ **带外绝不外推**
 
     返回 `where ∈ {InBand, BelowBand, AboveBand, NoLevels}`：
     只有 `InBand` 才给 `abs_ma`；带外给 `clamp_abs_ma`（最近一端的**实测**值），
     由调用方**如实降级显示**（与"亮度未知 ⇒ 显示亮度未知"是同一条纪律）。
+
+    ★★ G1（2026-09-16）：与 `TntgoBklCurve.estimate` **同一口径** ——
+       薄档既不进拟合，**也不算进实测带端点**（一条 n=2 的档给出的"带宽"和它的中位数一样是编的）。
+
+    ★★★★ G3（2026-09-16）：新增 `unusable ∈ {None, "Rejected", "NotEnoughLevels"}`
+       —— **与 `where` 正交的第二维**，回答"给不出数的【原因】"。
+
+    ⛔ **改这里的原因不是"补个字段"，而是镜像本身有同一个盲点**：
+       G3 之前 `fit_line` 返回 `None` 时这里**根本不查闸门** ⇒
+       「走向反物理」与「档位不足」被压成同一个 `where` ⇒
+       **镜像说不出"被拒"，正如卡片显示不出"被拒"**。
+       ★ 两处是同一个设计缺陷的两份实现 ⇒ 必须一起改，
+         否则下一轮对账会在这一维上**各自错、并且一致地错**（纪律 ⑪ 的形态）。
     """
-    if not levels:
+    wire = wire_levels(levels, min_n)
+    if not wire:
         return {"abs_ma": None, "where": "NoLevels", "clamp_abs_ma": None,
-                "band": None, "levels": 0}
-    s = sorted(levels, key=lambda l: l["mcu"])
+                "band": None, "levels": 0, "unusable": "NotEnoughLevels"}
+    s = sorted(wire, key=lambda l: l["mcu"])
     lo, hi = s[0], s[-1]
     band = [lo["mcu"], hi["mcu"]]
-    line = fit_line(levels)
-    if line is None:
-        only = s[0]
-        return {"abs_ma": None,
-                "where": "BelowBand" if mcu < only["mcu"] else "AboveBand",
-                "clamp_abs_ma": only["abs_ma"], "band": band, "levels": len(levels)}
     where = "BelowBand" if mcu < lo["mcu"] else ("AboveBand" if mcu > hi["mcu"] else "InBand")
+    # ★★★ G3：**先过闸门，再决定给不给数** —— 与 Kotlin `estimate()` 完全同口径。
+    #   ⛔ 原代码只在 `fit_line is None` 时才说"给不出数" ⇒ **漏了闸门**：
+    #      走向反物理时 `fit_line` **照样能拟合出一条直线**（那正是"能拟合但不该用"），
+    #      于是镜像会**照常给出一个数**，而产品侧给不出数 ⇒ 两边不一致。
+    #   ★ 这个洞是**本轮新加的 G3 判据抓出来的**（G3-a／G3-e 当场变红）——
+    #     不是"顺手多写两条"，而是它们真的分叉了。
+    verdict = check_mode(wire, trend, min_n)[0]
+    line = fit_line(wire) if verdict == "可拟合" else None
+    if line is None:
+        # ★ G3：位置照报（与可用分支同口径），**原因**另说 ——
+        #   ⚠️ 原代码把变量叫 `only`（"唯一那档"），那是"拟合失败＝只剩一档"时代的遗留名；
+        #      被拒时它其实是**最暗端那一档**。位置判定改用 `lo`，与 Kotlin 对齐。
+        return {"abs_ma": None,
+                "where": where,
+                "clamp_abs_ma": lo["abs_ma"] if mcu < lo["mcu"] else hi["abs_ma"],
+                "band": band, "levels": len(wire),
+                # ★ 只有"真的被闸门拒了"才叫 Rejected；其余（档位不足／数值退化）另说
+                "unusable": "Rejected" if verdict.startswith("反物理") else "NotEnoughLevels"}
     return {
         "abs_ma": (line["a"] + line["b"] * mcu) if where == "InBand" else None,
         "where": where,
         "clamp_abs_ma": lo["abs_ma"] if mcu < lo["mcu"] else hi["abs_ma"],
         "band": band,
-        "levels": len(levels),
+        "levels": len(wire),
+        # ★ G3：这条路径上**一定**能给出数（`line` 非 None 且 `unusable` 为 None）
+        "unusable": None,
     }
 
 
@@ -161,23 +230,110 @@ def worst_violation(levels, trend):
 
     ⚠️ 旧版 `max_drop()` **只表达放电方向**。直接把它接进产品运行时，
     会**把正确的充电曲线判死** —— 所以这里是参数化的,不是改个名字。
+
+    ★ **与 [widening_pair] 的关系**：同一判据的两种粒度（这里幅度、那里一整对）。
+      两者**必须一致** —— 回归里有判据盯着（C1）。
+    """
+    w = widening_pair(levels, trend)
+    return w["violation_ma"] if w else None
+
+
+def widening_pair(levels, trend):
+    """★★★★★ **"走向与物理相反"的那一对档 ＋ 幅度**（C1，2026-09-16）；`None` = 没有违规。
+
+    与 [worst_violation] **同一个判据** —— 这里返回"是哪一对"，那里只返回幅度。
+    ⚠️ 两者**必须一致**；回归里有判据盯着（`widening_pair(...)['violation_ma'] == worst_violation(...)`）。
+
+    ## ★★ 为什么必须存在（C1）
+
+    原来只报幅度 ⇒ 设备日志与判读输出里只有"反物理（走向与 X 态相悖）"，
+    **看不出是哪一对**。⛔ 后果不是"少一点信息"，而是**会把读的人引到相反的结论**：
+
+    | 只报 verdict | 读的人会得出 |
+    |---|---|
+    | 放电被拒 ＋ 充电被拒 | ★ **「方向无关」**（＝闸门坏了） |
+    | **真相** | 两个方向**各自**拒了**不同**的一对 ⇒ 闸门**按方向判得好好的** |
+
+    ★ 而"两条都拒 ⇒ 方向无关"**正是 G2 一开始把判据写错的同一个陷阱**
+      （见 `docs/20260916_AR13_G2_方向区分性证据.md` §2.3）⇒ `pairwise_violation()` 报的是
+      **全表逐对**，本函数报的是**表级**"到底哪一对把闸门打响"，两者互补。
+
+    @return `{'lo','hi','lo_abs_ma','hi_abs_ma','delta','violation_ma','trend','brief'}`
     """
     s = sorted(levels, key=lambda l: l["mcu"])
     if len(s) < 2:
         return None
-    worst = 0.0
+    best = None
     for i in range(1, len(s)):
-        # 相邻两档：`hi - lo` = 变亮带来的 |I| 变化量
-        delta = s[i]["abs_ma"] - s[i - 1]["abs_ma"]
+        lo, hi = s[i - 1], s[i]
+        delta = hi["abs_ma"] - lo["abs_ma"]
         bad = -delta if trend == "dis" else delta
-        if bad > worst:
-            worst = bad
-    return worst if worst > 0 else None
+        if bad > 0 and bad > (best["violation_ma"] if best else 0.0):
+            best = {"lo": lo["mcu"], "hi": hi["mcu"],
+                    "lo_abs_ma": lo["abs_ma"], "hi_abs_ma": hi["abs_ma"],
+                    "delta": delta, "violation_ma": bad, "trend": trend,
+                    "brief": "{}→{} 反向 {:.0f} mA".format(lo["mcu"], hi["mcu"], bad)}
+    return best
 
 
 def max_drop(levels):
     """⚠️ **兼容保留**：等价于「放电方向的违规」。新代码请用 [worst_violation]。"""
     return worst_violation(levels, "dis") or 0.0
+
+
+def pairwise_violation(levels):
+    """★★★★ **逐相邻对**给出两个方向的违规幅度（G2 的方向区分性判据）。
+
+    ## 为什么需要它 —— 原 G2 判据在真机数据上**不成立**（2026-09-16 实测）
+
+    G2 原本写作「**同一批数据换 `Trend` 必须合法**」。那个说法**只在单调数据上成立**：
+
+    | 数据 | 本方向 | 换方向 |
+    |---|---|---|
+    | 单调上升 | 违规 / 无 | 无 / 违规 ⇒ ★ 判据成立 |
+    | ★ **真机归档（非单调）** | 违规 | **也违规** ⇒ ⛔ 判据**假失败** |
+
+    真机那份台账里 `|I|` 是**先升后降再升**的 ⇒ **两个方向各自都能找到违规的一对**
+    （实测：放电 268 mA 来自 `178→497`，充电 724 mA 来自 `497→2000`，**是两对不同的档**）。
+    ⇒ ★ 结论不是「闸门不敏感」，而是「**判据写错了**」——
+      「两条都拒」与「方向无关」是**两件事**，而原判据把前者读成了后者。
+
+    ## 真正与数据形状无关的性质
+
+    **逐对**看：一对相邻档只可能朝一个方向违规 ——
+
+    | Δ = `|I|(亮) − |I|(暗)` | 放电方向 | 充电方向 |
+    |---|---|---|
+    | `> 0`（变亮更耗电） | 合法 | ★ 违规 |
+    | `< 0`（变亮更省电） | ★ 违规 | 合法 |
+    | `= 0` | 合法 | 合法 |
+
+    ⇒ ★★ **`min(pdis, pchg) == 0` 必须对【每一对】成立**。
+    这是数学上的互斥，**与数据单调与否无关**，因此对**任意真机台账**都能判它。
+    若 `trend` 被忽略（两个分支算出同一个数），这一条**必然失败** —— 判据**有牙**。
+
+    @return `{'pairs': [{'lo','hi','delta','dis','chg'}...], 'worst_dis','worst_chg',
+             'both_violating': [反例], 'decisive': 方向差最大的那一对}`
+    """
+    s = sorted(levels, key=lambda l: l["mcu"])
+    pairs = []
+    for i in range(1, len(s)):
+        delta = s[i]["abs_ma"] - s[i - 1]["abs_ma"]
+        # ★ 与 worst_violation 同口径：放电违规 = 变亮反而更省电；充电违规 = 变亮反而更耗电
+        pdis, pchg = max(0.0, -delta), max(0.0, delta)
+        pairs.append({"lo": s[i - 1]["mcu"], "hi": s[i]["mcu"], "delta": delta,
+                      "dis": pdis, "chg": pchg, "exclusive": min(pdis, pchg) == 0.0})
+    if not pairs:
+        return {"pairs": [], "worst_dis": 0.0, "worst_chg": 0.0,
+                "both_violating": [], "decisive": None}
+    decisive = max(pairs, key=lambda p: abs(p["dis"] - p["chg"]))
+    return {
+        "pairs": pairs,
+        "worst_dis": max(p["dis"] for p in pairs),
+        "worst_chg": max(p["chg"] for p in pairs),
+        "both_violating": [p for p in pairs if not p["exclusive"]],
+        "decisive": decisive,
+    }
 
 
 def spread(levels):
@@ -192,33 +348,54 @@ def spread(levels):
 
 # --------------------------------------------------------------- 真机判读
 
-def check_mode(levels, trend):
+#: ★ 方向的**自证用语**（C1）—— 与 `TntgoBklCurve.Trend.riseVerb()/badVerb()` **必须一致**
+TREND_RISE = {"dis": "上升", "chg": "下降"}
+TREND_BAD = {"dis": "更省电", "chg": "更耗电"}
+
+
+def check_mode(levels, trend, min_n=MIN_N_PER_LEVEL):
     """★★★ **单状态判读**（AR13：充电侧也走这里,不再有"只判放电"的暗门）。
+
+    ★★ C1（2026-09-16）：判读语与 `facts` **都带上"是哪一对"** ——
+       只报"反物理"而不报对，读的人**无法**分辨「两个方向各自拒了不同的一对」
+       与「两个方向都拒同一批数 ⇒ 方向无关」。
+
+    ★★ G1（2026-09-16）：**薄档（`n < min_n`）不进判据**，且判读语要说出剔了几档 ——
+       见 `wire_levels`。`min_n=1` = 关掉 G1（只给"有牙证伪"用）。
 
     @return `(verdict, why, facts)`；`facts` 供调用方做机器判读（回归套件用）。
     """
-    facts = {"levels": len(levels), "violation_ma": None, "thin": [],
-             "fit": None, "trend": trend}
+    facts = {"levels": len(levels), "wire": 0, "thin_dropped": 0, "violation_ma": None,
+             "thin": [], "fit": None, "trend": trend, "widening": None}
+    wire = wire_levels(levels, min_n)
+    facts["wire"] = len(wire)
+    facts["thin_dropped"] = len(levels) - len(wire)
     if not levels:
         return "证据不足", "这一态一档都没有 ⇒ ★ 不给曲线", facts
-    if len(levels) < MIN_LEVELS:
-        return "档位不足", f"只有 {len(levels)} 档 ⇒ 斜率无定义 ⇒ ★ 不给曲线", facts
-    v = worst_violation(levels, trend)
-    facts["violation_ma"] = v
-    if v is not None:
-        direction = "更省电" if trend == "dis" else "更耗电"
+    if not wire:
+        return ("档位不足",
+                "原 {} 档**全部**样本 < {} 条 ⇒ ★ G1 全剔 ⇒ 不给曲线".format(
+                    len(levels), min_n), facts)
+    if len(wire) < MIN_LEVELS:
+        drop = "（★ G1 已剔除证据太薄的 {} 档）".format(facts["thin_dropped"]) \
+            if facts["thin_dropped"] else ""
+        return "档位不足", "可用只有 {} 档{} ⇒ 斜率无定义 ⇒ ★ 不给曲线".format(len(wire), drop), facts
+    w = widening_pair(wire, trend)
+    facts["violation_ma"] = w["violation_ma"] if w else None
+    facts["widening"] = w
+    if w is not None:
+        state = "放电" if trend == "dis" else "充电"
         return ("反物理",
-                f"★ 有亮档比更暗的档还{direction}（反向 {v:.0f} mA）⇒ 有别的东西在漂 ⇒ 不采用",
+                "★ 有亮档比更暗的档还{}（{}，按{}态判：亮度↑ 时 |I| 应当{}）"
+                "⇒ 有别的东西在漂 ⇒ 不采用".format(
+                    TREND_BAD[trend], w["brief"], state, TREND_RISE[trend]),
                 facts)
-    if fit_line(levels) is None:
+    if fit_line(wire) is None:
         return "档位不足", "拟合数值退化 ⇒ ★ 不给曲线", facts
-    facts["fit"] = fit_line(levels)
-    thin = [l for l in levels if l["n"] < MIN_N_PER_LEVEL]
-    facts["thin"] = [l["mcu"] for l in thin]
-    if thin:
-        return "可拟合（证据薄）", "★ 有档位样本 < {} 条：{}".format(
-            MIN_N_PER_LEVEL, ", ".join(f"MCU {l['mcu']} (n={l['n']})" for l in thin)), facts
-    return "可拟合", "★ 档位、单调性、样本量都过关 ⇒ 可以出曲线", facts
+    facts["fit"] = fit_line(wire)
+    drop = "（★ G1 已剔除证据太薄的 {} 档）".format(facts["thin_dropped"]) \
+        if facts["thin_dropped"] else ""
+    return "可拟合", "★ 档位、单调性、样本量都过关{} ⇒ 可以出曲线".format(drop), facts
 
 
 def verdict_of(dis_levels, chg_levels):
@@ -264,6 +441,12 @@ def main():
         print("=" * 72)
         sys.exit(3)
 
+    # ★★ G1（2026-09-16）：**两张表都要**
+    #   `raw_*`  = 含薄档的完整分档 —— ★ **盘上 `bkl.curve` 存的就是它**（对账必须用它）
+    #   `dis/chg` = 闸门真正吃的那张表（G1 已剔薄档）—— **拟合与判读用它**
+    # ⚠️ 只打印一张会出事：拿过滤后的表去对盘上的原始表 ⇒ **假不一致**（本轮实际踩到）。
+    raw_dis = plateaus([s for s in samples if not s["chg"]], min_n=1)
+    raw_chg = plateaus([s for s in samples if s["chg"]], min_n=1)
     dis = plateaus([s for s in samples if not s["chg"]])
     chg = plateaus([s for s in samples if s["chg"]])
     v, why, vfacts = verdict_of(dis, chg)
@@ -277,17 +460,20 @@ def main():
         print("  ★ 旧格式样本**不参与拟合**：⛔ 不用出厂曲线反解补 MCU")
         print("     （反解是推算值，且曲线一改就会追溯篡改已采样本）")
 
-    for name, lv in (("放电", dis), ("充电", chg)):
-        print(f"\n【{name}】档位 {len(lv)} 个")
+    for name, raw, lv in (("放电", raw_dis, dis), ("充电", raw_chg, chg)):
+        print(f"\n【{name}】分档 {len(raw)} 个 ⇒ G1 后可用 {len(lv)} 个")
         print(f"  {'MCU':>6} {'n':>4}  {'中位|I|':>8}")
-        for l in lv:
-            thin = "  ⚠ 证据薄" if l["n"] < MIN_N_PER_LEVEL else ""
+        for l in raw:
+            thin = ""
+            if l["n"] < MIN_N_PER_LEVEL:
+                thin = "  ⛔ G1 剔除（样本 < {} ⇒ 中位数不代表这一档）".format(MIN_N_PER_LEVEL)
             print("  {:>6} {:>4}  {:>8.0f}{}".format(l["mcu"], l["n"], l["abs_ma"], thin))
         line = fit_line(lv)
         if line:
             print("  ⇒ |I| = {:.1f} + {:.4f}·MCU".format(line["a"], line["b"]))
             band = [min(x["mcu"] for x in lv), max(x["mcu"] for x in lv)]
-            print("  ⇒ ★ 实测带 MCU {}~{}（★ 带外**不外推**）".format(band[0], band[1]))
+            print("  ⇒ ★ 实测带 MCU {}~{}（★ 带外**不外推**；★ G1 之后带**只由可用档定**）"
+                  .format(band[0], band[1]))
             resid = [abs(l["abs_ma"] - (line["a"] + line["b"] * l["mcu"])) for l in lv]
             worst = max(resid)
             print("  ⇒ 最大残差 {:.0f} mA（相对最大 MAD {:.0f} ⇒ {:.1f}×）".format(
@@ -299,6 +485,9 @@ def main():
     # ── ★★★ 与 Kotlin 侧对账（**这才是本脚本存在的主要理由**）
     print("\n" + "-" * 72)
     print("★ 与 Kotlin 侧落盘的曲线对账（`bkl.curve`）—— 两边各写一遍，必须逐项相符")
+    print("  ⚠️ 对的是**同一件事的两种合法形态**：G1 **之前**落盘的是未过滤表；"
+          "G1 **之后**落盘的就是过滤后的表（`refreshCurve` 走 `buildCurve()`）。")
+    print("  ⛔ 两种都认，但**只认这两种** —— 别的任何差异都判红（不许把漂移放过去）。")
     if stored is None:
         print("  ⚠ 盘上没有 `bkl.curve`（mod 还没算过 / 刚复位）⇒ 无法对账")
     else:
@@ -310,10 +499,22 @@ def main():
                 print(f"  ✗ {name}：★ **盘上那份连表头都没找到** ⇒ "
                       f"解析坏了（不是「那边是空的」）—— 查 XML 实体解码")
                 return 1
-            bad = 0
-            if len(mine) != len(theirs):
-                print(f"  ✗ {name}：档位数 {len(mine)} vs {len(theirs)} ⇒ **不一致**")
+            # ★★★★ G1（2026-09-16）：盘上那份**有两种合法形态**，必须分开认：
+            #   ① **G1 之前**落盘的：原样是**未过滤**的档位表
+            #   ② **G1 之后**落盘的：产品写的就是**过滤后**的表（`refreshCurve` 走 `buildCurve()`）
+            # ⚠️ 只按形态 ① 判 ⇒ G1 之后**每次**都会报"档位数不一致 ⇒ 有一边是错的"（本轮实测）。
+            #    ⇒ 那是一条**假红**，而它的措辞（"有一边是错的"）会把人引去查一个**不存在的漂移**。
+            #    ★ 认法：`theirs` 若**恰好等于** `mine` 的 G1 过滤结果 ⇒ 判为"G1 之后的形态"，✓。
+            wire = wire_levels(mine)
+            if len(theirs) != len(mine):
+                if len(theirs) == len(wire) and _same_levels(wire, theirs):
+                    print(f"  ✓ {name}：{len(theirs)} 档**逐项一致**"
+                          f"（★ 盘上是 **G1 之后**的形态：原始 {len(mine)} 档 → 过滤 {len(wire)} 档）")
+                    return 0
+                print(f"  ✗ {name}：档位数 {len(mine)} vs {len(theirs)} ⇒ **不一致**"
+                      f"（G1 过滤后本应是 {len(wire)} 档）")
                 return 1
+            bad = 0
             for a, b in zip(mine, theirs):
                 dm, di, dn = abs(a["mcu"] - b[0]), abs(a["abs_ma"] - b[1]), a["n"] - b[2]
                 ok = dm == 0 and di < 0.05 and dn == 0
@@ -325,8 +526,8 @@ def main():
                 print(f"  ✓ {name}：{len(mine)} 档**逐项一致**")
             return bad
 
-        bad = cmp_list("放电", dis, stored["dis"])
-        bad += cmp_list("充电", chg, stored["chg"])
+        bad = cmp_list("放电", raw_dis, stored["dis"])
+        bad += cmp_list("充电", raw_chg, stored["chg"])
         if stored.get("legacy") is not None and stored["legacy"] != stats["legacy_no_mcu"]:
             print(f"  ✗ 旧格式计数 {stats['legacy_no_mcu']} vs {stored['legacy']}")
             bad += 1
@@ -343,12 +544,31 @@ def main():
         except ValueError:
             mcu_now = None
     if mcu_now is not None:
-        r = describe(dis, mcu_now)
+        # ★ 传【放电】方向 —— 卡片这一支本来就是放电态的查询（充电态卡片不用曲线）
+        r = describe(dis, mcu_now, trend="dis")
         print("\n" + "-" * 72)
         print(f"当前 MCU {mcu_now} ⇒ 放电态查询：where={r['where']}  "
+              f"unusable={r['unusable']}  "
               f"|I|={'—' if r['abs_ma'] is None else format(r['abs_ma'], '.0f')}  "
               f"带={r['band']}")
-        if r["where"] != "InBand":
+        # ★★★ G3（2026-09-16）：**把卡片第二行逐字打出来**，并区分两种"给不出数"。
+        #   理由：这句话是**用户唯一能看到的降级说明**，它必须能被离线复现
+        #   （否则措辞只能靠读 Kotlin 源码来确认 —— 而那是"两份实现各说各话"的土壤）。
+        band_s = ("（实测 {}~{}）".format(r["band"][0], r["band"][1])
+                  if r["band"] else "")
+        if r["unusable"] == "Rejected":
+            card = "★ 曲线被拒（走向反物理）"
+        elif r["unusable"] == "NotEnoughLevels":
+            card = "★ 尚无实测档位"
+        elif r["where"] == "InBand":
+            card = "（曲线）"
+        else:
+            card = "★ 该处未测{}，未外推".format(band_s)
+        print(f"  ⇒ 卡片第二行：@ 亮度 N% {card}")
+        if r["unusable"] is not None:
+            print("  ★ **不是「没测过」，是「测了但不可信」** —— "
+                  "两者在卡片上必须分开说（前者该【等】，后者该【重采】）")
+        elif r["where"] != "InBand":
             print("  ★ **不外推** —— 调用方应降级显示（用最近一端的实测值并注明「该处未测」）")
 
     print("\n" + "=" * 72)
@@ -516,6 +736,253 @@ def selftest():
         cases.append(("⑬ ★ 找不到 `TntgoBklCurve.kt` ⇒ **必须报失败**,不许静默跳过",
                       False, True))
         cases.append(("⑭ ★ 同上", False, True))
+
+    # ── ★★★★★ AR13-G2（2026-09-16）：闸门**方向区分性**的回归判据
+    #
+    # ⚠️ 原 G2 判据写作「同一批数据换 Trend 必须合法」—— 实测在**真机归档上不成立**，
+    #    因为那份台账是**非单调**的 ⇒ 两个方向各自都能找到违规的一对。
+    #    本组用例把「真机归档」和「单调数据」**分开处理**，并用一个与数据形状无关的
+    #    性质（逐对互斥）去盯住 `trend` 参数：
+    #      · 真机归档  ⇒ 逐对互斥 ＋ 两方向的最大违规来自**不同的对**
+    #      · 单调数据  ⇒ 换方向**必须**翻面（④d 已覆盖正例；⑱ 覆盖反例）
+    _fix = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "fixtures", "20260916_ar13_g2_direction_ledger.xml")
+    if os.path.exists(_fix):
+        _xml = open(_fix, encoding="utf-8").read()
+        _smp, _st = read_ledger(_xml)
+        # ★★ G1（2026-09-16）：**两张表都要看**
+        #    `_raw_*` = 含薄档的原始表（诊断用，`min_n=1`）
+        #    `_dis/_chg` = **闸门真正吃的那张表**（G1 已剔薄档）—— 下面所有产品行为判据都用它
+        _raw_dis = plateaus([s for s in _smp if not s["chg"]], min_n=1)
+        _raw_chg = plateaus([s for s in _smp if s["chg"]], min_n=1)
+        _dis = plateaus([s for s in _smp if not s["chg"]])
+        _chg = plateaus([s for s in _smp if s["chg"]])
+        _stored = read_curve(_xml)
+        # ⚠️ 逐对判据钉在**闸门真正吃的表**上（G1 之后表里不该再有薄档）
+        _pd, _pc = pairwise_violation(_dis), pairwise_violation(_chg)
+
+        # ── ★★★★★ G1 的三条（2026-09-16）
+        #
+        # ⚠️ 这一组**必须存在**，因为「G1 有没有生效」在**别的判据上全都看不出来**：
+        #    G1 生效与不生效，⑮⑯⑰ 之类都可能照样绿。它需要一个**能变红**的判据。
+        cases.append(("G1-a ★★ 真机台账里 `n < MIN_N_PER_LEVEL` 的薄档**被剔掉**（放电 5→3、充电 4→3）",
+                      len(_raw_dis) == 5 and len(_dis) == 3
+                      and len(_raw_chg) == 4 and len(_chg) == 3
+                      and [l["mcu"] for l in _raw_dis] == [44, 94, 178, 497, 2000]
+                      and [l["mcu"] for l in _dis] == [44, 497, 2000]
+                      and [l["mcu"] for l in _chg] == [178, 497, 2000], True))
+        cases.append(("G1-b ★★ 剩下的每一档都 `n >= MIN_N_PER_LEVEL`（不许留一条薄档）",
+                      bool(_dis) and bool(_chg)
+                      and all(l["n"] >= MIN_N_PER_LEVEL for l in _dis + _chg), True))
+        # ★★★ 这一条是 **G1 的因果证据**：同一份台账，**只在**开关 G1 时判读不同。
+        #     没有它，"曲线现在能拟合了"可能被归因成**别的东西**（比如夹具换了）。
+        cases.append(("G1-c ★★ 同一份台账：**关掉 G1 ⇒ 放电被拒（268）**；**开着 ⇒ 可拟合**"
+                      "（⇒ 薄档就是那个唯一原因）",
+                      worst_violation(_raw_dis, "dis") is not None
+                      and abs(worst_violation(_raw_dis, "dis") - 268.0) < 0.5
+                      and check_mode(_raw_dis, "dis", min_n=1)[0] == "反物理"
+                      and worst_violation(_dis, "dis") is None
+                      and check_mode(_dis, "dis")[0] == "可拟合", True))
+        cases.append(("G1-d ★★ 充电侧同一因果：关 G1 ⇒ 拒（356）；开 ⇒ 可拟合",
+                      worst_violation(_raw_chg, "chg") is not None
+                      and abs(worst_violation(_raw_chg, "chg") - 356.0) < 0.5
+                      and worst_violation(_chg, "chg") is None
+                      and check_mode(_chg, "chg")[0] == "可拟合", True))
+        # ★★ 负例守门：**不许把闸门修哑** —— 厚档真违规必须仍然被拒
+        cases.append(("G1-e ★★ 负例守门：厚档（n≥8）真反物理**必须仍然被拒**"
+                      "（放电更亮却更省电／充电更亮却更耗电）",
+                      check_mode([{"mcu": 497, "abs_ma": 1344.0, "n": 23},
+                                  {"mcu": 2000, "abs_ma": 1044.0, "n": 8}], "dis")[0] == "反物理"
+                      and check_mode([{"mcu": 497, "abs_ma": 3536.0, "n": 70},
+                                      {"mcu": 2000, "abs_ma": 3836.0, "n": 8}], "chg")[0] == "反物理", True))
+        # ★★ 判据要长在**唯一入口**上：回读的曲线（不经过 `plateaus`）也不能绕过 G1
+        cases.append(("G1-f ★★ 回读路径不能绕过 G1：`check_mode(含薄档的表)` 仍然把它们剔掉",
+                      check_mode(_raw_dis, "dis")[2]["thin_dropped"] == 2
+                      and check_mode(_raw_chg, "chg")[2]["thin_dropped"] == 1
+                      and check_mode(_raw_dis, "dis")[2]["wire"] == 3, True))
+        # ★ 全剔光 ⇒ 必须说"档位不足"，**不许**在空表上给曲线
+        cases.append(("G1-g ★ 一档样本都不够 ⇒ 报【档位不足】，不给曲线",
+                      check_mode([{"mcu": 44, "abs_ma": 980.0, "n": 1},
+                                  {"mcu": 497, "abs_ma": 1344.0, "n": 2}], "dis")[0] == "档位不足", True))
+
+        # ⑮ ★★ 核心性质：**逐对方向互斥**（与数据单调与否无关）
+        cases.append(("⑮ ★★ 真机归档：**每一对**相邻档的违规方向都互斥（放电/充电不可同时违规）",
+                      bool(_pd["pairs"]) and bool(_pc["pairs"])
+                      and not _pd["both_violating"] and not _pc["both_violating"], True))
+        # ⑯ ★ 逐对 max 必须**复现**表级判定 —— 防"只看第一对"式的假绿
+        #    ⚠️ 这里**故意用原始表**（G1 之后的表是单调的 ⇒ 逐对判据没有可判的东西）。
+        #       预期值**现从夹具算**，不写死（写死的转述值已经错过一次，见 ㉑ 的注释）。
+        _pd_raw = pairwise_violation(_raw_dis)
+        cases.append(("⑯ ★ 逐对 max 复现表级 worst_violation（同表同方向，逐项相符）",
+                      _pd_raw["worst_dis"] == (worst_violation(_raw_dis, "dis") or 0.0)
+                      and _pd_raw["worst_chg"] == (worst_violation(_raw_dis, "chg") or 0.0)
+                      and abs(_pd_raw["worst_dis"] - 268.0) < 0.5
+                      and abs(_pd_raw["worst_chg"] - 724.0) < 0.5, True))
+        # ⑰ ★★ **方向真的换得动**：取一对真实测到的相邻档，把两档**调过来**
+        #     ⇒ 违规方向必须**跟着翻**（否则闸门不看方向、只看"有没有下降"）
+        _k = _pd_raw["decisive"]                   # 原始表上是 497 → 2000（Δ=724）
+        _pair = [{"mcu": _k["lo"], "abs_ma": 1000.0, "n": 5},
+                 {"mcu": _k["hi"], "abs_ma": 1000.0 + _k["delta"], "n": 5}]
+        _db = worst_violation(_pair, "dis")        # 单调上升 ⇒ 放电合法、充电违规
+        _cb = worst_violation(_pair, "chg")
+        _pair_rev = [{"mcu": _k["lo"], "abs_ma": 1000.0 + _k["delta"], "n": 5},
+                     {"mcu": _k["hi"], "abs_ma": 1000.0, "n": 5}]
+        _da = worst_violation(_pair_rev, "dis")    # 翻过来 ⇒ 放电违规、充电合法
+        _ca = worst_violation(_pair_rev, "chg")
+        cases.append(("⑰ ★★ 同一对真机档位【调换】⇒ 违规方向必须跟着翻（闸门真的看 trend）",
+                      _db is None and _cb is not None and _da is not None and _ca is None, True))
+        # ⑱ ★★ **负例**：原 G2 判据（"换方向必须合法"）在**未过滤的**真机数据上**必须失败**
+        #     —— 把它钉住，防止有人"修好"这条判据而把一次**假失败**当成真结论。
+        #     ★ G1（2026-09-16）之后这条**只剩历史意义**：闸门吃的那张表已经单调，
+        #       于是"两个方向都能找到违规的一对"**不再成立**（这正是 G1 要的结果）。
+        #       ⇒ 判据改成：**原始表**上成立、**G1 之后的表**上不成立。两边都钉住。
+        cases.append(("⑱ ★★ 原 G2 判据在**未过滤**真机数据上必须不成立；在 **G1 之后**的表上"
+                      "变成【两个方向都合法】（＝ G1 真的把误杀消掉了）",
+                      (worst_violation(_raw_dis, "chg") is not None)
+                      and (worst_violation(_raw_chg, "dis") is not None)
+                      and worst_violation(_dis, "dis") is None
+                      and worst_violation(_chg, "chg") is None, True))
+        # ⑲ ★ 夹具必须**真的**是那台设备的那份台账（不是手抄的几档）
+        #    ⚠️ 与盘上 `bkl.curve` 对账的是**原始档位表**（盘上存的就是它）
+        cases.append(("⑲ ★ 夹具保真：240 条样本 ＋ 24 条旧格式 ＋ 表与盘上 `bkl.curve` 逐项一致"
+                      "（**用原始表对** —— 盘上存的是未过滤的档位）",
+                      len(_smp) == 240 and _st["legacy_no_mcu"] == 24
+                      and _stored is not None and not _stored["parse_broken"]
+                      and _stored["legacy"] == 24
+                      and [[l["mcu"], l["abs_ma"], l["n"]] for l in _raw_dis] == _stored["dis"]
+                      and [[l["mcu"], l["abs_ma"], l["n"]] for l in _raw_chg] == _stored["chg"], True))
+
+        # ── ★★★★★ C1（2026-09-16）：判读**必须说出"是哪一对"**
+        #
+        # ⚠️⚠️ **G1 之后，C1 的动机在【这份真机台账上】不再出现** —— 必须如实记下：
+        #   C1 原本的理由是「放电被拒 ＋ 充电被拒」会被读成「方向无关」。
+        #   而 G1 把薄档剔掉之后，**这份台账的两个方向都判"可拟合"** ⇒ 那个歧义
+        #   **在这份数据上不存在了**。C1 的机制（指名那一对）**仍然必须留着** ——
+        #   将来真出现"厚档反物理"时它照样是唯一能自证方向的东西（见 G1-e）。
+        #   ⇒ 所以下面改用**原始表**验机制，并**另加**一条钉住"G1 之后两向都合法"。
+        # ⚠️ 两条硬要求：
+        #   ① the pair 必须**由闸门自己的函数产出**（不许在这里重算 Δ —— 那就是自证，G2 §5.1）
+        #   ② 它必须与 `worst_violation` **数值一致**（同一判据的两种粒度，不许漂）
+        _wd = widening_pair(_raw_dis, "dis")
+        _wc = widening_pair(_raw_chg, "chg")
+        cases.append(("⑳ ★★ 表级违规必须能指名【哪一对】（原始放电表 178→497 反向 268 mA）",
+                      _wd is not None and (_wd["lo"], _wd["hi"]) == (178, 497)
+                      and abs(_wd["violation_ma"] - 268.0) < 0.5
+                      and _wd["brief"] == "178→497 反向 268 mA", True))
+        # ⚠️ 这里原先按 G2 证据文档 §3.2 的**转述表**写成 `497→2000 / 724` —— **写错了**：
+        #    `497→2000 反向 724` 是【放电表】在【充电方向】下的那一对（见 ㉒）。
+        #    充电表在**本方向**下的那一对是 `23→178`（`3704→4060`，反向 **356**）。
+        #    ⇒ ★ 教训与 G2 同一族：**表格里的转述不能当预期值**，预期必须现从夹具算。
+        cases.append(("㉑ ★★ 充电表也指名（原始充电表 23→178 反向 356 mA）＋ 与 worst_violation 数值一致",
+                      _wc is not None and (_wc["lo"], _wc["hi"]) == (23, 178)
+                      and abs(_wc["violation_ma"] - 356.0) < 0.5
+                      and _wc["violation_ma"] == worst_violation(_raw_chg, "chg")
+                      and _wd["violation_ma"] == worst_violation(_raw_dis, "dis"), True))
+        # ㉒ ★★ **方向自证**：同一张表在两个方向下指名的那一对**必须不同** ——
+        #    这一条正是"设备日志要带对与方向"要保住的性质（否则歧义又回来了）。
+        _wd_wrong_trend = widening_pair(_raw_dis, "chg")
+        cases.append(("㉒ ★★ 判读语里带的方向必须换得动（同一张表换方向 ⇒ 指名的那一对**必须变**）",
+                      _wd_wrong_trend is not None
+                      and (_wd_wrong_trend["lo"], _wd_wrong_trend["hi"]) != (_wd["lo"], _wd["hi"])
+                      and _wd_wrong_trend["trend"] == "chg" and _wd["trend"] == "dis", True))
+        # ㉓ ★ 判读语（why）里**真的**带上了对与方向（不只是在 facts 里）
+        #    ⚠️ 用 `min_n=1` 才拿得到那句"反物理" —— G1 之后闸门吃的那张表是单调的。
+        _why_c1 = check_mode(_raw_dis, "dis", min_n=1)[1]
+        cases.append(("㉓ ★ 判读语（why）里**真的**出现那一对与方向（人读的那句，不只是 facts）",
+                      "178→497" in _why_c1 and "放电" in _why_c1 and "上升" in _why_c1, True))
+        # ㉔ ★★ G1 之后，真机台账的两个方向都要判【可拟合】（这才叫"修好了"）
+        cases.append(("㉔ ★★ G1 之后真机台账**两个方向都判可拟合**（放电 3 档／充电 3 档）",
+                      check_mode(_dis, "dis")[0] == "可拟合"
+                      and check_mode(_chg, "chg")[0] == "可拟合", True))
+    else:
+        cases.append(("⑮ ★ 找不到真机夹具（`scripts/fixtures/…g2_direction_ledger.xml`）"
+                      "⇒ **必须报失败**,不许静默跳过", False, True))
+        for _n in ("G1-a", "G1-b", "G1-c", "G1-d", "G1-e", "G1-f", "G1-g",
+                   "⑯", "⑰", "⑱", "⑲", "⑳", "㉑", "㉒", "㉓", "㉔"):
+            cases.append(("{} ★ 同上（夹具不在 ⇒ 不许静默跳过）".format(_n), False, True))
+
+    # ── ★★★★★ G1 的**真机端到端**证据（装机后 adb pull 的那份台账，已提交为夹具）
+    #
+    # ⚠️ 为什么必须单独一条：上面 ⑮–㉔ 用的是 **G1 之前**落盘的那份夹具，
+    #    它的放电表**只有 2 个薄档**。而装机后新采的样本里又多出一条 `mcu=1000 n=1`
+    #    ⇒ 薄档数从 **2** 变成 **4**。★ "G1 在**新数据**上也剔得对"**只在这份夹具上看得到**。
+    # ⛔ 不提交这份夹具 ⇒ `.ref/` 被 gitignore ⇒ 这条在新克隆上会**静默消失**
+    #    （AR13 已经为同一件事踩过一次，见 g2 夹具的注释）。
+    # ⚠️ 本文件里**没有** `SCRIPTS` 这个名字（那是 `run_bkl_tests.py` 的常量）
+    #    ⇒ 必须**自己取**当前文件所在目录（第一次写就踩到 `NameError`）。
+    _here = os.path.dirname(os.path.abspath(__file__))
+    g1fix = os.path.join(_here, "fixtures", "20260916_g1_post_deploy_ledger.xml")
+    if os.path.exists(g1fix):
+        _x = open(g1fix, encoding="utf-8").read()
+        _s, _st = read_ledger(_x)
+        _rd = plateaus([q for q in _s if not q["chg"]], min_n=1)
+        _rc = plateaus([q for q in _s if q["chg"]], min_n=1)
+        _d = plateaus([q for q in _s if not q["chg"]])
+        _c = plateaus([q for q in _s if q["chg"]])
+        _stored = read_curve(_x)
+        cases.append(("G1-装机-a ★★ 装机后台账：薄档 **4** 个被剔（放电 `94/178/1000` ＋ 充电 `23`）"
+                      "⇒ 与设备日志「★ G1 剔除样本 < 3 的档 4 个」**逐字吻合**",
+                      len(_s) == 240 and _st["legacy_no_mcu"] == 23
+                      and [l["mcu"] for l in _rd] == [44, 94, 178, 497, 1000, 2000]
+                      and [l["mcu"] for l in _d] == [44, 497, 2000]
+                      and [l["mcu"] for l in _rc] == [23, 178, 497, 2000]
+                      and [l["mcu"] for l in _c] == [178, 497, 2000]
+                      and (len(_rd) - len(_d)) + (len(_rc) - len(_c)) == 4, True))
+        cases.append(("G1-装机-b ★★ 装机后台账：两条曲线都判【可拟合】"
+                      "（＝设备日志「放电档位 3 个 ⇒ 可插值｜充电档位 3 个 ⇒ 可插值」）",
+                      check_mode(_d, "dis")[0] == "可拟合"
+                      and check_mode(_c, "chg")[0] == "可拟合"
+                      and len(_d) == 3 and len(_c) == 3, True))
+        cases.append(("G1-装机-c ★★ 盘上 `bkl.curve` 是 **G1 之后**的形态："
+                      "逐项等于过滤后的表（不是原始表）",
+                      _stored is not None and not _stored["parse_broken"]
+                      and _same_levels(_d, _stored["dis"])
+                      and _same_levels(_c, _stored["chg"]), True))
+    else:
+        cases.append(("G1-装机-a ★ 找不到装机后台账夹具"
+                      "（`scripts/fixtures/20260916_g1_post_deploy_ledger.xml`）⇒ **报失败**",
+                      False, True))
+        for _n in ("G1-装机-b", "G1-装机-c"):
+            cases.append(("{} ★ 同上（夹具不在 ⇒ 不许静默跳过）".format(_n), False, True))
+
+    # ── ★★★★ G3（2026-09-16）：给不出数的【原因】必须与【位置】分开 ────────────
+    #    ⛔ 这一组守的是一个**已经发生过的 bug**：G3 之前
+    #       「曲线被拒」被压成 `where != InBand` ⇒ 卡片把它说成"该处未测"。
+    #       两个原因对应**相反的动作**（等 vs 重采），所以必须能分开。
+    def _card_reason(r):
+        """★ 与 Kotlin `powerNoteText()` **同口径**的措辞 —— 只用来判"分不分得开"，
+        不作为产品文案的唯一定义（真正的措辞由 `run_bkl_tests` 的结构判据钉住）。"""
+        if r["unusable"] == "Rejected":
+            return "★ 曲线被拒（走向反物理）"
+        if r["unusable"] == "NotEnoughLevels":
+            return "★ 尚无实测档位"
+        if r["where"] == "InBand":
+            return "（曲线）"
+        return "★ 该处未测，未外推"
+
+    _g3_rej = plateaus(seq([(63, 989, 10), (497, 2100, 10), (2000, 1200, 10)]))
+    _g3_thin = plateaus(seq([(44, 980, 1), (497, 1344, 1)]))     # 全被 G1 剔掉
+    _r_rej_in = describe(_g3_rej, 497)                            # ★ 带内、但被拒
+    _r_rej_out = describe(_g3_rej, 2000)                          # ★ 带上沿、被拒
+    _r_thin = describe(_g3_thin, 497)
+    _r_ok = describe(plateaus(seq([(63, 989, 10), (497, 1248, 10), (2000, 2113, 10)])), 497)
+    cases.append(("G3-a ★★ 曲线被拒时 `unusable=Rejected`（**带内也照样说被拒**）",
+                  _r_rej_in["unusable"] == "Rejected"
+                  and _r_rej_in["where"] == "InBand"
+                  and _r_rej_in["abs_ma"] is None, True))
+    cases.append(("G3-b ★★ 「被拒」与「该处未测」在卡片上是**两句不同的话**"
+                  "（＝G3 要修的那个 bug；两句一样就报红）",
+                  _card_reason(_r_rej_in) != _card_reason(describe(lv, 3000))
+                  and _card_reason(_r_rej_in) != _card_reason(_r_thin), True))
+    cases.append(("G3-c ★ 「档位全被剔」⇒ `NotEnoughLevels`（不是 Rejected，也不是带外）",
+                  _r_thin["unusable"] == "NotEnoughLevels"
+                  and _r_thin["where"] == "NoLevels", True))
+    cases.append(("G3-d ★ 可用时 `unusable=None`（**不许把好数据的结论也标成不可信**）",
+                  _r_ok["unusable"] is None and _r_ok["abs_ma"] is not None, True))
+    cases.append(("G3-e ★ 被拒时**位置照旧报对**（上沿 2000 仍是 InBand，不是 AboveBand）"
+                  "—— 位置与原因**正交**",
+                  _r_rej_out["where"] == "InBand"
+                  and _r_rej_out["unusable"] == "Rejected", True))
 
     print("=" * 72)
     print("analyze_bkl_curve · 自检（合成台账 · 确定性噪声）")

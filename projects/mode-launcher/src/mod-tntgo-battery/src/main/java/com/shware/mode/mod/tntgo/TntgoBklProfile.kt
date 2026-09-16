@@ -171,27 +171,63 @@ class TntgoBklProfile(context: Context) {
         val all = samples()
         val legacy = all.count { it.mcu == null }
         val withMcu = all.filter { it.mcu != null }
+        // ★★ G1（2026-09-16）：**建表时就把薄档剔掉**，并把剔了几档量出来。
+        //    ⚠️ 门槛传 [TntgoBklCurve.MIN_N_PER_LEVEL]（唯一来源）——
+        //    这里若写死一个数字，两边一漂就没人发现。
+        val chg = TntgoBklCurve.plateauing(
+            withMcu.filter { it.charging }, { it.mcu }, { it.absMa.toDouble() },
+            minN = TntgoBklCurve.MIN_N_PER_LEVEL,
+        )
+        val dis = TntgoBklCurve.plateauing(
+            withMcu.filter { !it.charging }, { it.mcu }, { it.absMa.toDouble() },
+            minN = TntgoBklCurve.MIN_N_PER_LEVEL,
+        )
+        thinDropped = chg.thinDropped + dis.thinDropped
         return TntgoBklCurve.Curves(
-            charging = TntgoBklCurve.plateaus(
-                withMcu.filter { it.charging }, { it.mcu }, { it.absMa.toDouble() },
-            ),
-            discharging = TntgoBklCurve.plateaus(
-                withMcu.filter { !it.charging }, { it.mcu }, { it.absMa.toDouble() },
-            ),
+            charging = chg.levels,
+            discharging = dis.levels,
             legacyNoMcu = legacy,
         )
     }
 
+    /** 建表时被 G1 剔掉的薄档数（★ 供日志报出来；每次 [buildCurve] 刷新） */
+    @Volatile
+    private var thinDropped: Int = 0
+
     /**
-     * ★★ **算一次并把结果落盘**（卡片每次刷新都会调用 ⇒ 内部按样本条数节流）。
+     * ★★ **算一次并把结果落盘**（卡片每次刷新都会调用 ⇒ 内部按「台账有没有变」节流）。
      *
      * ⚠️ **落的是"档位表 + 拟合系数"，不是原始样本的替代品** ——
      * 原始样本仍在 `bkl.samples` 里；曲线**随时可以从它重算**。
      * 存下来的唯一目的是：**卡片与离线脚本能对着同一份东西说话**（可对账）。
+     *
+     * ## ★★★★★ 节流键**不能只用条数**（2026-09-16 实测的静默失效）
+     *
+     * 本函数的节流原来**只比样本条数**（`条数 == 上次建表时的条数`），
+     * 而 [record] 是**环形**保留 [KEEP] 条
+     * （`while (list.size > KEEP) list.removeAt(0)`）。
+     * ⇒ ★★ 台账**装满之后**（`KEEP` 条 ≈ 2 小时），新样本进来会**挤掉最旧一条**，
+     *   **总条数恒为 240 不变** ⇒ 节流**永远命中** ⇒ **`gate()` 从此再也不执行**。
+     *
+     * 实测（2026-09-16 11:21–11:22，台账 240 条已满）：
+     *
+     * ```
+     * 末条样本 -1545 → -1605 → -1507   （台账确实在长）
+     * 盘上 bkl.curve  age 496 → 519 → 541 → 563 s   （逐字不变，只增不减）
+     * ```
+     *
+     * ⇒ ★ **失效方式是"让一切看起来正常"**（纪律 ⑨ 那一族）：
+     *   卡片照常渲染、日志一行异常都没有，**只是永远停在一个几十分钟前的快照上**
+     *   —— 连"曲线被拒"这件事也一起停住了。
+     * ⇒ 新鲜度判据必须**看内容**（末条样本），**不能看条数**。
      */
     fun refreshCurve(force: Boolean = false) {
-        val total = samplesRaw().size
-        if (!force && total == lastBuiltCount && sp.contains(K_CURVE)) return
+        val raw = samplesRaw()
+        // ★ 计数 ＋ 末条样本：台账是环形缓冲 ⇒ 条数会在 KEEP 处**封顶不动**，
+        //   只有末条样本能证明"内容真的换了"。
+        val key = "${raw.size}#${raw.lastOrNull().orEmpty()}"
+        if (!force && key == lastBuiltKey && sp.contains(K_CURVE)) return
+        val total = raw.size
         val c = buildCurve()
         val payload = buildString {
             append("{\"v\":2")
@@ -202,25 +238,58 @@ class TntgoBklProfile(context: Context) {
             append("}")
         }
         sp.edit().putString(K_CURVE, payload).apply()
-        lastBuiltCount = total
+        // ★ 记账的是**同一个 key**（条数 ＋ 末条样本）—— 改了节流键却忘了改这个 ⇒ 每一轮都重算。
+        lastBuiltKey = key
         // ★★★ AR13：判读**必须带方向** —— 放电「上升」、充电「下降」。
         //     ⚠️ 接线前这里只打"档位够不够"，**反物理曲线照旧打"可插值"**，
         //        而 `maxDrop()` 零调用点 ⇒ 文档里的第二道闸门**从未生效**。
+        // ★★★★ C1（2026-09-16）：判读语**还要说出"是哪一对"** ——
+        //     原来只报 verdict ⇒「放电被拒 ＋ 充电被拒」会被读成「方向无关」，
+        //     而真相是两个方向各自拒了**不同**的一对（见 TntgoBklCurve.wideningPair 注释）。
         val d = TntgoBklCurve.gate(c.discharging, TntgoBklCurve.Trend.Discharge)
         val g = TntgoBklCurve.gate(c.charging, TntgoBklCurve.Trend.Charge)
         Log.i(
             TAG,
-            "AR12b：曲线重算（样本 $total 条，可用带 MCU 的 ${total - c.legacyNoMcu} 条）" +
-                    "｜放电档位 ${c.discharging.size} 个 ⇒ ${verdictText(d, "放电")}" +
-                    "｜充电档位 ${c.charging.size} 个 ⇒ ${verdictText(g, "充电")}",
+            "AR12b：曲线重算（样本 $total 条，可用带 MCU 的 ${total - c.legacyNoMcu} 条" +
+                    // ★★ G1：**剔了几档必须报** —— 否则读日志的人分不清
+                    //    「只测到 2 档」（要用户多测）与「测到 5 档、2 档太薄被剔」（数据本身有噪声）。
+                    (if (thinDropped > 0)
+                        "，★ G1 剔除样本 < ${TntgoBklCurve.MIN_N_PER_LEVEL} 的档 $thinDropped 个"
+                    else "") +
+                    "）｜放电档位 ${c.discharging.size} 个 ⇒ " +
+                    verdictText(d, c.discharging, TntgoBklCurve.Trend.Discharge) +
+                    "｜充电档位 ${c.charging.size} 个 ⇒ " +
+                    verdictText(g, c.charging, TntgoBklCurve.Trend.Charge),
         )
     }
 
-    /** 判读等级 ⇒ **给人看的**一句话。★ 三种等级都要有话说（含糊会让人以为"没问题"）。 */
-    private fun verdictText(v: TntgoBklCurve.Verdict, name: String): String = when (v) {
-        TntgoBklCurve.Verdict.Ok -> "可插值"
-        TntgoBklCurve.Verdict.NotEnoughLevels -> "★ 档位不足，不给曲线"
-        TntgoBklCurve.Verdict.Rejected -> "★★ 反物理（走向与${name}态相悖）⇒ 曲线不采用"
+    /**
+     * 判读等级 ⇒ **给人看的**一句话。★ 三种等级都要有话说（含糊会让人以为"没问题"）。
+     *
+     * ★★★★ **C1：`Rejected` 必须说出"是哪一对档"** —— 形参由 `name: String`
+     * 换成 `trend: Trend`，因为那句话里**必须**带上判它时用的方向：
+     * 只报"反物理"而不报方向，读日志的人**无法**分辨
+     * 「两个方向各自拒了不同的一对」（＝闸门按方向判得好好的）与
+     * 「两个方向都拒同一批数」（＝闸门根本没看方向）。
+     */
+    private fun verdictText(
+        v: TntgoBklCurve.Verdict,
+        levels: List<TntgoBklCurve.Level>,
+        trend: TntgoBklCurve.Trend,
+    ): String {
+        val state = if (trend == TntgoBklCurve.Trend.Discharge) "放电" else "充电"
+        return when (v) {
+            TntgoBklCurve.Verdict.Ok -> "可插值"
+            TntgoBklCurve.Verdict.NotEnoughLevels -> "★ 档位不足，不给曲线"
+            TntgoBklCurve.Verdict.Rejected -> {
+                // ★ 那一对**由闸门自己的函数产出**，日志处**不再重算** Δ
+                //   （自己再实现一遍受测逻辑 ⇒ 判据只能自证，见 G2 §5.1 的假绿）
+                val w = TntgoBklCurve.wideningPair(levels, trend)
+                val detail = if (w == null) "★ 内部不一致：拒了却说不出是哪一对"
+                             else "${w.brief()}，按${state}态判：变亮反而${trend.badVerb()}"
+                "★★ 反物理（$detail）⇒ 曲线不采用"
+            }
+        }
     }
 
     /**
@@ -234,7 +303,8 @@ class TntgoBklProfile(context: Context) {
         if (!raw.contains("\"v\":$CURVE_FORMAT_V")) {
             // ★ 版本对不上（格式改过）⇒ 让 refreshCurve 重算一次，不要硬解
             Log.w(TAG, "曲线格式版本不是 $CURVE_FORMAT_V ⇒ 丢弃并重算（格式已升级，不硬解旧结构）")
-            lastBuiltCount = -1
+            // ★ 清掉新鲜度键 ⇒ 下一次 refreshCurve **一定**重算一次（空串永不等于真实 key）
+            lastBuiltKey = ""
             return TntgoBklCurve.Curves()
         }
         return runCatching { parseCurve(raw) }.getOrElse {
@@ -333,6 +403,12 @@ class TntgoBklProfile(context: Context) {
         private const val CURVE_FORMAT_V = 2
     }
 
-    /** 上次重算曲线时的样本条数（节流用） */
-    private var lastBuiltCount = -1
+    /**
+     * 上次重算曲线时的**新鲜度键**（节流用）—— 形如 `"240#81:1000:-1507:0"`。
+     *
+     * ⚠️⛔ **不要改回"只存条数"**：台账是环形保留 [KEEP] 条 ⇒ 装满之后条数**恒定**，
+     * 只比条数会让曲线**永不重算**（实测静默失效 8 分钟以上、无任何异常日志）。
+     * ★ 回归套件里有一条**反向守卫**盯着这件事（④-⑨-B）。
+     */
+    private var lastBuiltKey = ""
 }
